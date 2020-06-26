@@ -12,11 +12,10 @@ import (
 	"os"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 )
 
-func SaveStockNames(csvpath string) {
+func FetchStocks(csvpath string) {
 	file, e := os.OpenFile(csvpath, os.O_WRONLY|os.O_CREATE, 0666)
 	if e != nil {
 		log.Fatal(e)
@@ -25,7 +24,7 @@ func SaveStockNames(csvpath string) {
 	for page := 0; page < 82; {
 		time.Sleep(time.Second * 5)
 		url := fmt.Sprintf("http://portal.morningstarjp.com/StockInfo/sec/list?page=%d", page)
-		if code, body := Curl(url,true); code == 200 {
+		if code, body := Fetch(url,true); code == 200 {
 			ex := regexp.MustCompile(`(\d+)"([^/]+)/a/tdtdclass="tac"東証１部`)
 			matches := ex.FindAllStringSubmatch(body, -1)
 			for _, match := range matches {
@@ -36,7 +35,7 @@ func SaveStockNames(csvpath string) {
 		}
 	}
 }
-func GetStocks(csvpath, include string, colname, colcode int) []Stock {
+func LoadStocks(csvpath string) []Stock {
 	//ファイルを開く
 	f, e := os.Open(csvpath)
 	if e != nil {
@@ -48,28 +47,22 @@ func GetStocks(csvpath, include string, colname, colcode int) []Stock {
 	if e != nil {
 		log.Fatal(e)
 	}
-	returnStocks := []Stock{}
+	returnStocks := make([]Stock,0,len(rows))
 	for _, row := range rows {
-		flag := false
-		for _, m := range row {
-			flag = flag || strings.Contains(m, include)
-		}
-		if flag {
-			stock := Stock{}
-			if stock.Code, e = strconv.Atoi(row[colcode]); e == nil {
-				stock.Prices = GetPrices(stock.Code)
-				returnStocks = append(returnStocks, stock)
-			} else {
-				log.Println("WARNING", e)
-			}
+		if len(row)==2{
+			code,_ := strconv.Atoi(row[0])
+			returnStocks = append(returnStocks, Stock{
+				Name: row[1],
+				Code: code,
+			})
 		}
 	}
 	return returnStocks
 }
 
-func GetPrices(code int) (outs []Price) {
+func FetchPrices(code int) (outs []Price) {
 	url := fmt.Sprintf("https://stocks.finance.yahoo.co.jp/stocks/history/?code=%4d.T", code)
-	if code, body := Curl(url,false); code == 200 {
+	if code, body := Fetch(url,false); code == 200 {
 		matches := regexp.MustCompile(`trtd(\d+年\d+月\d+日)/tdtd(\d+)/tdtd(\d+)/tdtd(\d+)/tdtd(\d+)/tdtd(\d+)/tdtd(\d+)/td/tr`).FindAllStringSubmatch(body, -1)
 		outs = make([]Price, len(matches))
 		for i := 0; i < len(matches); i++ {
@@ -87,7 +80,7 @@ func GetPrices(code int) (outs []Price) {
 	}
 	return outs
 }
-func Curl(url string, shiftjis bool) (int, string) {
+func Fetch(url string, shiftjis bool) (int, string) {
 	var r io.Reader
 	w, e := http.Get(url)
 	if e==nil{

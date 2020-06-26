@@ -1,9 +1,5 @@
 package main
 
-import (
-	"fmt"
-)
-
 type Price struct {
 	Unix, Open, Close, High, Low int
 }
@@ -19,19 +15,19 @@ type Text struct {
 }
 type User struct {
 	Id     int
-	Screen string
+	Screen, Name string
 	Texts  []Text
 }
 
 func main() {
-	SaveStockNames("stocknames.csv")
-	return
 	users := []User{
 		User{
+			Name:"ぱちょ@株とDVC",
+			Id:1086060182860292096,
 			Screen: "h2bl0cker_",
 		},
 	}
-	fmt.Println()
-	users = append(users, GetMatchedUsers(50, users, []string{"株", "投資"}, []string{})...)
+	users = append(users, FetchUsers(50, users, []string{"株", "投資"}, []string{})...)
+	SaveUsers("users.csv",users)
 	UpdateTexts(users)
 }
