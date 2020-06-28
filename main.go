@@ -7,6 +7,7 @@ type Price struct {
 type Stock struct {
 	Name   string
 	Code   int
+	Market rune
 	Prices []Price
 }
 type Text struct {
@@ -19,7 +20,10 @@ type User struct {
 	Texts  []Text
 }
 
-func main() {
+func main(){
+	FetchStocks("stocksall.csv")
+}
+func main2() {
 	users := []User{
 		User{
 			Name:"ぱちょ@株とDVC",

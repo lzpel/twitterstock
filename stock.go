@@ -25,10 +25,19 @@ func FetchStocks(csvpath string) {
 		time.Sleep(time.Second * 5)
 		url := fmt.Sprintf("http://portal.morningstarjp.com/StockInfo/sec/list?page=%d", page)
 		if code, body := Fetch(url,true); code == 200 {
-			ex := regexp.MustCompile(`(\d+)"([^/]+)/a/tdtdclass="tac"東証１部`)
+			ex := regexp.MustCompile(`(\d+)"([^/]+)/a/tdtdclass="tac"(東証１部|東証２部|マザーズ|ＪＡＳＤＡＱ)`)
 			matches := ex.FindAllStringSubmatch(body, -1)
 			for _, match := range matches {
-				fmt.Fprintf(file,"%s,%s\n", match[1], match[2])
+				fmt.Fprintf(file,"%s,%s,%s\n",
+					match[1],
+					map[string]string{
+						"東証１部":"1",
+						"東証２部":"2",
+						"マザーズ":"m",
+						"ＪＡＳＤＡＱ":"j",
+					}[match[3]],
+					match[2],
+				)
 			}
 			fmt.Println(page,len(matches))
 			page++
@@ -49,10 +58,11 @@ func LoadStocks(csvpath string) []Stock {
 	}
 	returnStocks := make([]Stock,0,len(rows))
 	for _, row := range rows {
-		if len(row)==2{
+		if len(row)==3{
 			code,_ := strconv.Atoi(row[0])
 			returnStocks = append(returnStocks, Stock{
 				Name: row[1],
+				Market: rune(row[2][0]),
 				Code: code,
 			})
 		}
