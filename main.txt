@@ -19,16 +19,7 @@ import (
 	"time"
 )
 
-type Price struct {
-	Unix, Open, Close, High, Low int
-}
 
-type Stock struct {
-	Name   string
-	Code   int
-	Market rune
-	Prices []Price
-}
 type Text struct {
 	Text string
 	Unix int
@@ -39,11 +30,11 @@ type User struct {
 	Texts        []Text
 }
 
-func main() {
+func main1() {
 	//FetchStocks("stocks.csv")
 	LoadStocks("stocks.csv")
 }
-func main2() {
+func main() {
 	users := []User{
 		User{
 			Name:   "ぱちょ@株とDVC",
