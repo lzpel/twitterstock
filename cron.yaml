@@ -1,9 +1,9 @@
 cron:
-- description: "/market/update"
-  url: /market/update
-  schedule: 15:00
-  timezone: Asia/Tokyo
-- description: "/twitter/update"
-  url: /twitter/update
-  schedule: 15:30
-  timezone: Asia/Tokyo
+  - description: /market/update
+    url: /market/update
+    schedule: every day 15:00
+    timezone: Asia/Tokyo
+  - description: /twitter/update
+    url: /twitter/update
+    schedule: every day 15:30
+    timezone: Asia/Tokyo
