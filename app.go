@@ -15,23 +15,29 @@ func main() {
 		UpdatePrediction()
 	})
 	Handle("/", func(w Response, r Request) {
-		if len(r.FormValue("u"))>0{
-			UpdatePrediction()
-		}
+		markets := make([]Market, 0, 1)
+		TableGetAll(NewQuery("MARKET").Limit(cap(markets)).Order("-Born"), &markets)
 		predicts := make([]Predict, 0, 1)
 		TableGetAll(NewQuery("PREDICT").Limit(cap(predicts)).Order("-Born"), &predicts)
-		if len(predicts)==0{
+		if len(predicts)==0||len(markets)==0{
 			fmt.Fprintln(w,"error")
 		}else{
 			cp,up:=Possibility{},Possibility{}
 			ToData(&cp,predicts[0].CodesPossibility)
 			ToData(&up,predicts[0].UsersPossibility)
-			fmt.Fprintln(w,"<a href='/'>/</a>","<a href='/?u=1'>/?u=1</a>")
+			fmt.Fprintln(w,"<a href='/twitter/update'>update</a>")
+			fmt.Fprintln(w,"<hr>")
 			for i,v:=range predicts[0].Codes{
-				fmt.Fprintf(w,"<p>#%v %v %v</p>",i,v,cp[v])
+				fmt.Fprintf(w,"<p>#%v <a href='#%v'>%v</a> %v</p>",i,v,v,cp[v])
 			}
+			fmt.Fprintln(w,"<hr>")
 			for i,v:=range predicts[0].Users{
 				fmt.Fprintf(w,"<p><a href=https://twitter.com/intent/user?user_id=%v>#%v %v</a></p>",v.Id,i,up[v.Id])
+			}
+			fmt.Fprintln(w,"<hr>")
+			fmt.Fprintf(w,"<p>%v %v</p>",markets[0].Born,len(markets[0].Prices))
+			for _,v:=range markets[0].Prices{
+				fmt.Fprintf(w,"<p id=%v>#%v %v %v %v %v</p>",v.Code,v.Code, v.FullName,v.Name,v.Open,v.Diff)
 			}
 		}
 	})
