@@ -4,7 +4,12 @@
 
 ## 目標
 
-次回：株価取得
+### ツイート取得
+
+https://qiita.com/kai_kou/items/336a9d1290c13abba7e2
+https://developer.twitter.com/en/docs/twitter-api/v1/tweets/search/api-reference/get-search-tweets
+
+### 
 
 - 銘柄を絞るべき
     - 理由

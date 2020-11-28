@@ -1,19 +1,77 @@
 package main
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 func main() {
+	time.Local, _ = time.LoadLocation("Asia/Tokyo")
+	Credentialize("service.json")
 	Handle("/market/update", func(w Response, r Request) {
-		count := TableCount(NewQuery("MARKET").Filter("Born>", time.Now().Add(-12*time.Hour)))
-		if count == 0 {
-			TablePut("MARKET", &Market{
-				Born:   time.Now(),
-				Prices: FetchStock(),
-			})
+		UpdateMarket()
+	})
+	Handle("/twitter/update", func(w Response, r Request) {
+		UpdatePrediction()
+	})
+	Handle("/", func(w Response, r Request) {
+		if len(r.FormValue("u"))>0{
+			UpdatePrediction()
+		}
+		predicts := make([]Predict, 0, 1)
+		TableGetAll(NewQuery("PREDICT").Limit(cap(predicts)).Order("-Born"), &predicts)
+		if len(predicts)==0{
+			fmt.Fprintln(w,"error")
+		}else{
+			cp,up:=Possibility{},Possibility{}
+			ToData(&cp,predicts[0].CodesPossibility)
+			ToData(&up,predicts[0].UsersPossibility)
+			fmt.Fprintln(w,"<a href='/'>/</a>","<a href='/?u=1'>/?u=1</a>")
+			for i,v:=range predicts[0].Codes{
+				fmt.Fprintf(w,"<p>#%v %v %v</p>",i,v,cp[v])
+			}
+			for i,v:=range predicts[0].Users{
+				fmt.Fprintf(w,"<p><a href=https://twitter.com/intent/user?user_id=%v>#%v %v</a></p>",v.Id,i,up[v.Id])
+			}
 		}
 	})
-	Credentialize("service.json")
-	Listen()
+	if false {
+		UpdatePrediction()
+	} else {
+		Listen()
+	}
+}
+func UpdateMarket() {
+	if TableCount(NewQuery("MARKET").Filter("Born>", time.Now().Add(-12*time.Hour))) == 0 {
+		prices := FetchStock()
+		if prices != nil {
+			TablePut(NewKey("MARKET"), &Market{
+				Born:   time.Now(),
+				Prices: prices,
+			})
+		}
+	}
+}
+func UpdatePrediction() {
+	markets := make([]Market, 0, 3)
+	TableGetAll(NewQuery("MARKET").Limit(cap(markets)).Order("-Born"), &markets)
+	predicts := make([]Predict, 0, 1)
+	TableGetAll(NewQuery("PREDICT").Limit(cap(predicts)).Order("-Born"), &predicts)
+	if len(predicts)==0 {
+		predicts=append(predicts,Predict{
+			Users: []User{
+				{
+					Id: SeedUserId,
+				},
+			},
+		})
+	}
+	predict := Prediction(predicts[0].Users, markets)
+	key := predicts[0].Self
+	if predict.Born != predicts[0].Born {
+		key = NewKey("PREDICT")
+	}
+	TablePut(key, &predict)
 }
 func WriteResponse(w Response, params interface{}) {
 	WriteTemplate(w, params, nil, "app.html")
