@@ -72,8 +72,8 @@ func PredictId(tweet *anaconda.Tweet, unix int64) int64 {
 func UserPossibility(user *User, dict []Price, day time.Time) Possibility {
 	day = Daily(day)
 	//蓄積
-	cache:=MapPossibility{}
-	ToData(&cache,user.Cache)
+	cache := MapPossibility{}
+	ToData(&cache, user.Cache)
 	if v, ok := cache[int(day.Unix())]; ok && v != nil {
 		return v
 	}
@@ -100,13 +100,13 @@ func UserPossibility(user *User, dict []Price, day time.Time) Possibility {
 	//正規化
 	Normalize(r)
 	//保存
-	for k, _ := range cache{
-		if k < int(time.Now().Add(- time.Hour*24*7).Unix()) {
+	for k, _ := range cache {
+		if k < int(time.Now().Add(- time.Hour * 24 * 7).Unix()) {
 			delete(cache, k)
 		}
 	}
 	cache[int(day.Unix())] = r
-	user.Cache=ToJson(cache)
+	user.Cache = ToJson(cache)
 	return r
 }
 
@@ -115,14 +115,14 @@ func UserPossibility(user *User, dict []Price, day time.Time) Possibility {
 func MarketPossibility(prices []Price) Possibility {
 	r := Possibility{}
 	for _, v := range prices {
-		if v.Code==4755 || v.Code==1925{
+		if v.Code == 4755 || v.Code == 1925 {
 			//楽天（楽天）への言及
 			//大和ハウス（ハウス）への言及
 			continue
 		}
 		if v.Diff > 0 {
 			r[v.Code] = +1
-		}else{
+		} else {
 			r[v.Code] = -1
 		}
 	}
@@ -175,8 +175,8 @@ func Prediction(ul []User, markets []Market) Predict {
 	daily := Daily(time.Now())
 	//予測：上位2割
 	ppl := []Possibility{}
-	for i:=0;i<len(ul)/5;i++{
-		ppl = append(ppl, UserPossibility(&ul[i], markets[0].Prices, daily.Add(-time.Hour*24)))
+	for _, v := range ul {
+		ppl = append(ppl, UserPossibility(&v, markets[0].Prices, daily.Add(-time.Hour*24)))
 	}
 	cp := Integrate(ppl)
 	cl := make([]int, 0, len(cp))
