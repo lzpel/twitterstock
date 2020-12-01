@@ -3,11 +3,13 @@ package main
 import (
 	"fmt"
 	"github.com/ChimeraCoder/anaconda"
+	"math"
 	"math/rand"
 	"net/url"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -20,6 +22,7 @@ import (
 const (
 	SeedUserId = 1086060182860292096 //ぱちょ@h2bl0cker_
 	UsersLimit = 50
+	IgnoreWords = "楽天トレンド"
 )
 
 // @fn
@@ -90,15 +93,19 @@ func UserPossibility(user *User, dict []Price, day time.Time) Possibility {
 	} else {
 		for _, tweet := range tweets {
 			PredictId(&tweet, 0)
-			for _, price := range dict {
-				if strings.Contains(tweet.FullText, price.Name) || (len(price.FullName) > 0 && strings.Contains(tweet.FullText, price.FullName)) {
-					r[price.Code] += 1
+			for _, p := range dict {
+				if false==(strings.Contains(tweet.FullText, p.Name) || strings.Contains(tweet.FullText, p.FullName)) {
+					continue
 				}
+				if true==(strings.Contains(IgnoreWords,p.Name) || strings.Contains(IgnoreWords, p.Name)){
+					continue
+				}
+				r[p.Code] += 1
 			}
 		}
+		//正規化
+		Normalize(r,true)
 	}
-	//正規化
-	Normalize(r)
 	//保存
 	for k, _ := range cache {
 		if k < int(time.Now().Add(- time.Hour * 24 * 7).Unix()) {
@@ -115,18 +122,16 @@ func UserPossibility(user *User, dict []Price, day time.Time) Possibility {
 func MarketPossibility(prices []Price) Possibility {
 	r := Possibility{}
 	for _, v := range prices {
-		if v.Code == 4755 || v.Code == 1925 {
-			//楽天（楽天）への言及
-			//大和ハウス（ハウス）への言及
-			continue
+		if v.Close<10||v.Open<10{
+			continue//浮動小数点読み込みミスを暫定的に除外
 		}
-		if v.Diff > 0 {
-			r[v.Code] = +1
-		} else {
-			r[v.Code] = -1
+		if x:=float32(v.Close-v.Open)/float32(v.Open);0.5>math.Abs(float64(x)){
+			r[v.Code] = x
+		}else{
+			fmt.Println("Outliers",v)
 		}
 	}
-	Normalize(r)
+	Normalize(r,false)
 	return r
 }
 
@@ -138,18 +143,28 @@ func Integrate(m []Possibility) Possibility {
 			r[k] += v
 		}
 	}
-	Normalize(r)
 	return r
 }
 
 /// @fn
-func Normalize(r Possibility) {
+func Normalize(r Possibility,isDistribution bool) {
 	sum := float32(0)
 	for _, v := range r {
 		sum += v
 	}
-	for k, _ := range r {
-		r[k] /= sum
+	if isDistribution{
+		for k, _ := range r {
+			r[k] /= sum
+		}
+	}else{
+		avg,std:=sum/float32(len(r)),float32(0)
+		for _, v := range r {
+			std += (v-avg)*(v-avg)
+		}
+		std=float32(math.Sqrt(float64(std)/float64(len(r))))
+		for k, v := range r {
+			r[k] = (v-avg)/std
+		}
 	}
 }
 
@@ -173,19 +188,36 @@ func Daily(t time.Time) time.Time {
 func Prediction(ul []User, markets []Market) Predict {
 	//時刻
 	daily := Daily(time.Now())
-	//予測：上位2割
+	//追加：上位2割
+	ul = AppendUsers(ul, UsersLimit/5)
+	//非同期キャッシュ
+	wg:=&sync.WaitGroup{}
+	for i, _ := range ul {
+		wg.Add(1)
+		go func(u *User,m []Market,t time.Time){
+			defer wg.Done()
+			UserPossibility(u, markets[0].Prices, daily.Add(-time.Hour*24))
+			for _, m := range markets {
+				UserPossibility(u, m.Prices, m.Born.Add(-time.Hour*24))
+			}
+		}(&ul[i],markets,daily)
+	}
+	wg.Wait()
+	//予測
 	ppl := []Possibility{}
-	for _, v := range ul {
-		ppl = append(ppl, UserPossibility(&v, markets[0].Prices, daily.Add(-time.Hour*24)))
+	for i:=0;i<UsersLimit||i<len(ul);i++ {
+		ppl = append(ppl, UserPossibility(&ul[i], markets[0].Prices, daily.Add(-time.Hour*24)))
 	}
 	cp := Integrate(ppl)
+	Normalize(cp,true)
 	cl := make([]int, 0, len(cp))
 	for k, _ := range cp {
 		cl = append(cl, int(k))
 	}
 	sort.Slice(cl, func(i, j int) bool { return cp[cl[i]] > cp[cl[j]] })
-	//追加：上位2割
-	ul = AppendUsers(ul, UsersLimit/5)
+	for _, v := range cl {
+		fmt.Println(v, cp[v])
+	}
 	//検証
 	up := Possibility{}
 	for _, m := range markets {
@@ -196,7 +228,7 @@ func Prediction(ul []User, markets []Market) Predict {
 			up[ul[i].Id] += Correlation(mpp, mup)
 		}
 	}
-	Normalize(up)
+	Normalize(up,true)
 	//厳選
 	sort.Slice(ul, func(i, j int) bool { return up[ul[i].Id] > up[ul[j].Id] })
 	if len(ul) > UsersLimit {
@@ -204,9 +236,6 @@ func Prediction(ul []User, markets []Market) Predict {
 	}
 	for _, v := range ul {
 		fmt.Println(v.Id, up[v.Id])
-	}
-	for _, v := range cl {
-		fmt.Println(v, cp[v])
 	}
 	return Predict{
 		Born:             daily,

@@ -12,7 +12,7 @@ func main() {
 		UpdateMarket()
 	})
 	Handle("/twitter/update", func(w Response, r Request) {
-		UpdatePrediction()
+		UpdatePrediction(true,1)
 	})
 	Handle("/", func(w Response, r Request) {
 		markets := make([]Market, 0, 1)
@@ -41,43 +41,35 @@ func main() {
 			}
 		}
 	})
-	if false {
-		UpdatePrediction()
+	if true {
+		p:=UpdatePrediction(true,10)
+		_=p
 	} else {
 		Listen()
 	}
 }
 func UpdateMarket() {
-	if TableCount(NewQuery("MARKET").Filter("Born>", time.Now().Add(-12*time.Hour))) == 0 {
-		prices := FetchStock()
-		if prices != nil {
-			TablePut(NewKey("MARKET"), &Market{
-				Born:   time.Now(),
-				Prices: prices,
-			})
-		}
+	if market := FetchMarket(); market != nil {
+		TablePut(NewKey("MARKET"), market)
 	}
 }
-func UpdatePrediction() {
+func UpdatePrediction(put bool,count int) Predict{
 	markets := make([]Market, 0, 3)
 	TableGetAll(NewQuery("MARKET").Limit(cap(markets)).Order("-Born"), &markets)
 	predicts := make([]Predict, 0, 1)
 	TableGetAll(NewQuery("PREDICT").Limit(cap(predicts)).Order("-Born"), &predicts)
-	if len(predicts)==0 {
-		predicts=append(predicts,Predict{
-			Users: []User{
-				{
-					Id: SeedUserId,
-				},
-			},
-		})
+	predict:=predicts[0]
+	for i:=0;i<count;i++{
+		predict = Prediction(predict.Users, markets)
+		if put{
+			key := predicts[0].Self
+			if predict.Born != predicts[0].Born {
+				key = NewKey("PREDICT")
+			}
+			TablePut(key, &predict)
+		}
 	}
-	predict := Prediction(predicts[0].Users, markets)
-	key := predicts[0].Self
-	if predict.Born != predicts[0].Born {
-		key = NewKey("PREDICT")
-	}
-	TablePut(key, &predict)
+	return predict
 }
 func WriteResponse(w Response, params interface{}) {
 	WriteTemplate(w, params, nil, "app.html")

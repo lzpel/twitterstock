@@ -20,22 +20,30 @@ func Fetch(url string,) (int, string) {
 }
 
 func ToInt(s string) int{
-	r,_:=strconv.Atoi(s)
-	return r
+	if r, err := strconv.Atoi(s);err!=nil{
+		if f, err := strconv.ParseFloat(s, 64);err != nil {
+			panic(err)
+			return 0
+		}else{
+			return int(f)
+		}
+	}else{
+		return r
+	}
 }
 
-func FetchStock() []Price{
-	timetoday:=time.Now()
+func FetchMarket() *Market{
+	now:=time.Now().In(time.Local)
 	result:=make([]Price,0,500)
 	for page := 1; page <= 10; page++{
 		url := fmt.Sprintf("https://www.nikkei.com/markets/kabu/nidxprice/?StockIndex=N500&Gcode=00&hm=%d", page)
 		if code, body := Fetch(url); code == 200 {
 			//fmt.Println(body)
 			timematch:=regexp.MustCompile(`更新:(\d+)/(\d+)/(\d+)`).FindStringSubmatch(body)
-			if(timetoday.Day()!=ToInt(timematch[3])){
+			if now.Day()!=ToInt(timematch[3]){
 				return nil
 			}
-			matches := regexp.MustCompile(`<trclass=tr2>.*?title=(.*?)の株価情報>(\d+).*?株価情報>(.*?)</a></td>.*?(\d+)<br>.*?(\d+)<br>.*?(\d+)<br>.*?(\d+)</span>.*?([－＋±])(\d+).*?</tr>`).FindAllStringSubmatch(body, -1)
+			matches := regexp.MustCompile(`<trclass=tr2>.*?title=(.*?)の株価情報>(\d+).*?株価情報>(.*?)</a></td>.*?([\d\.]+)<br>.*?([\d\.]+)<br>.*?([\d\.]+)<br>.*?([\d\.]+)</span>.*?([－＋±])([\d\.]+).*?</tr>`).FindAllStringSubmatch(body, -1)
 			for _, match := range matches {
 				fmt.Println(match)
 				p:=Price{
@@ -46,7 +54,7 @@ func FetchStock() []Price{
 					High:  ToInt(match[5]),
 					Low:   ToInt(match[6]),
 					Close: ToInt(match[7]),
-					Diff:  ToInt(match[9])*map[string]int{"－":-1, "±":0, "＋":+1,}[match[8]],
+					Diff:  ToInt(match[9])*map[string]int{"－":-1, "±":0, "＋":+1}[match[8]],
 				}
 				result=append(result, p)
 			}
@@ -55,5 +63,8 @@ func FetchStock() []Price{
 		}
 		time.Sleep(time.Millisecond * 500)
 	}
-	return result
+	return &Market{
+		Born:   now,
+		Prices: result,
+	}
 }
