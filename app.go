@@ -46,7 +46,7 @@ func UpdateMarket() {
 	}
 }
 func UpdatePrediction(put bool,count int) Predict{
-	markets := make([]Market, 0, 3)
+	markets := make([]Market, 0, 5)
 	TableGetAll(NewQuery("MARKET").Limit(cap(markets)).Order("-Born"), &markets)
 	predicts := make([]Predict, 0, 1)
 	TableGetAll(NewQuery("PREDICT").Limit(cap(predicts)).Order("-Born"), &predicts)

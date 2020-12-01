@@ -5,5 +5,5 @@ cron:
     timezone: Asia/Tokyo
   - description: /twitter/update
     url: /twitter/update
-    schedule: every day 01:00
+    schedule: every 60 minutes
     timezone: Asia/Tokyo
