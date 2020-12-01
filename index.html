@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>結果</title>
+</head>
+<body>
+<a href='/twitter/update?r={{Rand}}'>update</a>
+<p>株価取得日時：{{.Market.Born}}</p>
+<p>株価取得個数：{{.Market.Prices | len}}</p>
+<table>
+    {{$Codes := .Predict.CodesPossibility | ToData}}
+    {{range .Predict.Codes}}
+    <tr>
+        <td><a href='#{{.}}'>#{{.}}</a></td>
+        <td>{{ index $Codes . }}</td>
+    </tr>
+    {{end}}
+</table>
+<hr>
+<table>
+    {{$Users := .Predict.UsersPossibility | ToData}}
+    {{range .Predict.Users}}
+    <tr>
+        <td><a href='https://twitter.com/intent/user?user_id={{.Id}}'>#{{.Id}}</a></td>
+        <td>{{ index $Users .Id }}</td>
+    </tr>
+    {{end}}
+</table>
+<hr>
+<table>
+    <tr>
+        <th>証券番号</th>
+        <th>銘柄略称</th>
+        <th>銘柄名</th>
+        <th>始値</th>
+        <th>終値</th>
+    </tr>
+    {{range .Market.Prices}}
+        <tr id="{{.Code}}">
+            <td>#{{.Code}}</td>
+            <td>{{.Name}}</td>
+            <td>{{.FullName}}</td>
+            <td>{{.Open}}</td>
+            <td>{{.Close}}</td>
+        </tr>
+    {{end}}
+</table>
+</body>
+</html>

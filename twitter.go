@@ -203,21 +203,6 @@ func Prediction(ul []User, markets []Market) Predict {
 		}(&ul[i],markets,daily)
 	}
 	wg.Wait()
-	//予測
-	ppl := []Possibility{}
-	for i:=0;i<UsersLimit||i<len(ul);i++ {
-		ppl = append(ppl, UserPossibility(&ul[i], markets[0].Prices, daily.Add(-time.Hour*24)))
-	}
-	cp := Integrate(ppl)
-	Normalize(cp,true)
-	cl := make([]int, 0, len(cp))
-	for k, _ := range cp {
-		cl = append(cl, int(k))
-	}
-	sort.Slice(cl, func(i, j int) bool { return cp[cl[i]] > cp[cl[j]] })
-	for _, v := range cl {
-		fmt.Println(v, cp[v])
-	}
 	//検証
 	up := Possibility{}
 	for _, m := range markets {
@@ -236,6 +221,21 @@ func Prediction(ul []User, markets []Market) Predict {
 	}
 	for _, v := range ul {
 		fmt.Println(v.Id, up[v.Id])
+	}
+	//予測
+	ppl := []Possibility{}
+	for i:=0;i<len(ul);i++ {
+		ppl = append(ppl, UserPossibility(&ul[i], markets[0].Prices, daily.Add(-time.Hour*24)))
+	}
+	cp := Integrate(ppl)
+	Normalize(cp,true)
+	cl := make([]int, 0, len(cp))
+	for k, _ := range cp {
+		cl = append(cl, int(k))
+	}
+	sort.Slice(cl, func(i, j int) bool { return cp[cl[i]] > cp[cl[j]] })
+	for _, v := range cl {
+		fmt.Println(v, cp[v])
 	}
 	return Predict{
 		Born:             daily,
