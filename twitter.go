@@ -249,8 +249,8 @@ func Prediction(ul []User, markets []Market) Predict {
 /// @fn 追加する
 func AppendUsers(users []User, count int) []User {
 	rand.Seed(time.Now().UnixNano())
-	// 上位2割から
-	idx := rand.Intn(len(users)) / 5
+	//全ユーザーから一人を選出
+	idx := rand.Intn(len(users))
 	id := users[idx].Id
 	// フォローを抽出
 	v := url.Values{}
