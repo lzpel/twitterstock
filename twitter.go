@@ -248,7 +248,7 @@ func Prediction(ul []User, markets []Market) Predict {
 		fmt.Println(v, cp[v])
 	}
 	return Predict{
-		Born:             now,
+		Born:             Daily(now),
 		Users:            ul,
 		UsersPossibility: ToJson(up),
 		Codes:            cl,
