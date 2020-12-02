@@ -17,7 +17,6 @@
     </tr>
     {{end}}
 </table>
-<hr>
 <table>
     {{$Users := .Predict.UsersPossibility | ToData}}
     {{range .Predict.Users}}
@@ -45,6 +44,13 @@
             <td>{{.Close}}</td>
         </tr>
     {{end}}
+</table>
+<table>
+{{range .Market.Prices}}
+    <tr>
+        <td></td>
+    </tr>
+{{end}}
 </table>
 </body>
 </html>
