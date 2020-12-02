@@ -20,9 +20,11 @@ import (
 /// 学術的に意味がある簡単なデータ構造を引数や戻り値に設定すると使いまわしやすい
 
 const (
-	SeedUserId = 1086060182860292096 //ぱちょ@h2bl0cker_
-	UsersLimit = 50
-	IgnoreWords = "楽天トレンド"
+	SeedUserId  = 1086060182860292096 //ぱちょ@h2bl0cker_
+	UsersLimit  = 50
+	IgnoreWords = "楽天トレンドサイバーハウス平和ローソングリー武田イオンソニー"
+	//株価と関係ないツイートの例
+	//楽天証券 サイバーマンデー ホワイトハウス 平和賞 #ローソンから一足早くお届け #武田愛奈 ライオン アンソニー・ファウチ所長
 )
 
 // @fn
@@ -70,10 +72,17 @@ func PredictId(tweet *anaconda.Tweet, unix int64) int64 {
 	return 0
 }
 
+func Daily(t time.Time) time.Time {
+	const PREDICT_HOUR = 8
+	t = t.In(time.Local).Add(-time.Hour * time.Duration(PREDICT_HOUR))
+	return time.Date(t.Year(), t.Month(), t.Day(), PREDICT_HOUR, 0, 0, 0, time.Local)
+}
+
 /// @fn
 /// time.Localで指定された時間帯でtimeを含む一日につぶやかれたUserのツイートから確率分布を抽出する
-func UserPossibility(user *User, dict []Price, day time.Time) Possibility {
-	day = Daily(day)
+func UserPossibility(user *User, dict []Price, day time.Time, verbose bool) Possibility {
+	//時刻
+	day=Daily(day)
 	//蓄積
 	cache := MapPossibility{}
 	ToData(&cache, user.Cache)
@@ -84,8 +93,8 @@ func UserPossibility(user *User, dict []Price, day time.Time) Possibility {
 	//収集
 	v := url.Values{}
 	v.Set("user_id", strconv.Itoa(user.Id))
-	v.Set("max_id", strconv.FormatInt(PredictId(nil, day.Unix()+86400), 10))
-	v.Set("since_id", strconv.FormatInt(PredictId(nil, day.Unix()), 10))
+	v.Set("max_id", strconv.FormatInt(PredictId(nil, day.Unix()), 10))
+	v.Set("since_id", strconv.FormatInt(PredictId(nil, day.Add(-24 * time.Hour).Unix()), 10))
 	v.Set("count", strconv.Itoa(200))
 	v.Set("exclude_replies", "false")
 	if tweets, err := NewApi().GetUserTimeline(v); err != nil {
@@ -94,17 +103,24 @@ func UserPossibility(user *User, dict []Price, day time.Time) Possibility {
 		for _, tweet := range tweets {
 			PredictId(&tweet, 0)
 			for _, p := range dict {
-				if false==(strings.Contains(tweet.FullText, p.Name) || strings.Contains(tweet.FullText, p.FullName)) {
+				if len(p.FullName)==0{
+					p.FullName="空文字列含有判定回避"
+				}
+				if false == (strings.Contains(tweet.FullText, p.Name) || strings.Contains(tweet.FullText, p.FullName)) {
 					continue
 				}
-				if true==(strings.Contains(IgnoreWords,p.Name) || strings.Contains(IgnoreWords, p.Name)){
+				if true == (strings.Contains(IgnoreWords, p.Name) || strings.Contains(IgnoreWords, p.Name)) {
 					continue
+				}
+				if verbose {
+					created, _ := tweet.CreatedAtTime()
+					fmt.Println(day, created.In(time.Local), p.Name, tweet.Id)
 				}
 				r[p.Code] += 1
 			}
 		}
 		//正規化
-		Normalize(r,true)
+		Normalize(r, true)
 	}
 	//保存
 	for k, _ := range cache {
@@ -122,16 +138,16 @@ func UserPossibility(user *User, dict []Price, day time.Time) Possibility {
 func MarketPossibility(prices []Price) Possibility {
 	r := Possibility{}
 	for _, v := range prices {
-		if v.Close<10||v.Open<10{
-			continue//浮動小数点読み込みミスを暫定的に除外
+		if v.Close < 10 || v.Open < 10 {
+			continue //浮動小数点読み込みミスを暫定的に除外
 		}
-		if x:=float32(v.Close-v.Open)/float32(v.Open);0.5>math.Abs(float64(x)){
+		if x := float32(v.Close-v.Open) / float32(v.Open); 0.5 > math.Abs(float64(x)) {
 			r[v.Code] = x
-		}else{
-			fmt.Println("Outliers",v)
+		} else {
+			fmt.Println("Outliers", v)
 		}
 	}
-	Normalize(r,false)
+	Normalize(r, false)
 	return r
 }
 
@@ -147,23 +163,23 @@ func Integrate(m []Possibility) Possibility {
 }
 
 /// @fn
-func Normalize(r Possibility,isDistribution bool) {
+func Normalize(r Possibility, isDistribution bool) {
 	sum := float32(0)
 	for _, v := range r {
 		sum += v
 	}
-	if isDistribution{
+	if isDistribution {
 		for k, _ := range r {
 			r[k] /= sum
 		}
-	}else{
-		avg,std:=sum/float32(len(r)),float32(0)
+	} else {
+		avg, std := sum/float32(len(r)), float32(0)
 		for _, v := range r {
-			std += (v-avg)*(v-avg)
+			std += (v - avg) * (v - avg)
 		}
-		std=float32(math.Sqrt(float64(std)/float64(len(r))))
+		std = float32(math.Sqrt(float64(std) / float64(len(r))))
 		for k, v := range r {
-			r[k] = (v-avg)/std
+			r[k] = (v - avg) / std
 		}
 	}
 }
@@ -178,29 +194,23 @@ func Correlation(a, b Possibility) float32 {
 	return c
 }
 
-func Daily(t time.Time) time.Time {
-	t = t.In(time.Local)
-	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.Local)
-}
-
 /// @fn
 /// ユーザーリストを更新し、予測する
 func Prediction(ul []User, markets []Market) Predict {
-	//時刻
-	daily := Daily(time.Now())
+	now := time.Now()
 	//追加：上位2割
 	ul = AppendUsers(ul, UsersLimit/5)
 	//非同期キャッシュ
-	wg:=&sync.WaitGroup{}
+	wg := &sync.WaitGroup{}
 	for i, _ := range ul {
 		wg.Add(1)
-		go func(u *User,m []Market,t time.Time){
+		go func(u *User, ms []Market, t time.Time, verbose bool) {
 			defer wg.Done()
-			UserPossibility(u, markets[0].Prices, daily.Add(-time.Hour*24))
-			for _, m := range markets {
-				UserPossibility(u, m.Prices, m.Born.Add(-time.Hour*24))
+			UserPossibility(u, ms[0].Prices, t, verbose)
+			for _, m := range ms {
+				UserPossibility(u, m.Prices, m.Born, verbose)
 			}
-		}(&ul[i],markets,daily)
+		}(&ul[i], markets, now, true)
 	}
 	wg.Wait()
 	//検証
@@ -209,11 +219,11 @@ func Prediction(ul []User, markets []Market) Predict {
 		mpp := MarketPossibility(m.Prices)
 		for i, _ := range ul {
 			//vではなくul[i]を使い複製を回避し参照を渡す
-			mup := UserPossibility(&ul[i], m.Prices, m.Born.Add(-time.Hour*24))
+			mup := UserPossibility(&ul[i], m.Prices, m.Born, false)
 			up[ul[i].Id] += Correlation(mpp, mup)
 		}
 	}
-	Normalize(up,true)
+	Normalize(up, true)
 	//厳選
 	sort.Slice(ul, func(i, j int) bool { return up[ul[i].Id] > up[ul[j].Id] })
 	if len(ul) > UsersLimit {
@@ -224,11 +234,11 @@ func Prediction(ul []User, markets []Market) Predict {
 	}
 	//予測
 	ppl := []Possibility{}
-	for i:=0;i<len(ul);i++ {
-		ppl = append(ppl, UserPossibility(&ul[i], markets[0].Prices, daily.Add(-time.Hour*24)))
+	for i := 0; i < len(ul); i++ {
+		ppl = append(ppl, UserPossibility(&ul[i], markets[0].Prices, now, false))
 	}
 	cp := Integrate(ppl)
-	Normalize(cp,true)
+	Normalize(cp, true)
 	cl := make([]int, 0, len(cp))
 	for k, _ := range cp {
 		cl = append(cl, int(k))
@@ -238,7 +248,7 @@ func Prediction(ul []User, markets []Market) Predict {
 		fmt.Println(v, cp[v])
 	}
 	return Predict{
-		Born:             daily,
+		Born:             now,
 		Users:            ul,
 		UsersPossibility: ToJson(up),
 		Codes:            cl,
@@ -310,7 +320,7 @@ func TestTwitter() {
 	}
 	fmt.Println(Integrate([]Possibility{Possibility{1: 1, 2: 1}, {2: 1, 3: 2}}))
 	fmt.Println(Correlation(Possibility{1: 0.5, 2: 0.5}, Possibility{2: 0.5, 3: 0.5}))
-	fmt.Println(UserPossibility(&users[0], markets[0].Prices, time.Now()))
+	fmt.Println(UserPossibility(&users[0], markets[0].Prices, time.Now(), true))
 	fmt.Println(MarketPossibility(markets[0].Prices))
 	Prediction(users, markets)
 	fmt.Println()
