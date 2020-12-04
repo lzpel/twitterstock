@@ -81,12 +81,7 @@ func Daily(t time.Time) time.Time {
 
 func HasReference(s string,p*Price) bool{
 	FormatString:=func(s string) string{
-		//空文字列
-		if len(s)==0{
-			return "空文字列含有判定回避"
-		}
-		//全角英数字
-		return strings.ToUpper(string(norm.NFKC.Bytes([]byte(s))))
+		return norm.NFKC.String(s)
 	}
 	IsValid:=func(s string) bool{
 		const IgnoreWords = "トレンドサイバーローソン"
@@ -94,11 +89,11 @@ func HasReference(s string,p*Price) bool{
 		for _,c:=range s{
 			if (c >= 'A' && c <= 'Z')||(c >= '0' && c <= '9'){
 				score+=75// 300/4==75
-			}
-			if unicode.In(c, unicode.Hiragana)||unicode.In(c, unicode.Katakana){
+			}else if unicode.In(c, unicode.Hiragana)||unicode.In(c, unicode.Katakana){
 				score+=75
+			}else{
+				score+=100
 			}
-			score+=100
 		}
 		if strings.Contains(IgnoreWords,s){
 			score=0
@@ -345,10 +340,15 @@ func TestTwitter() {
 			},
 		},
 	}
+	fmt.Println(false,HasReference("メタボリックシンドローム", &Price{Name: "ローム", FullName: "ローム"}))
+	fmt.Println(true,HasReference("東京ドーム", &Price{Name: "東京ドーム", FullName: "東京ドーム"}))
+	fmt.Println(true,HasReference("家畜ふん尿からＬＰガス家で使える燃料に古河電工", &Price{Name: "古河電", FullName: "古河電気工業"}))
+	fmt.Println(false,HasReference("体が戦艦大和より硬いのにいきなり動くから", &Price{Name: "大和", FullName: "大和証券グループ本社"}))
+	fmt.Println(false,HasReference("lại rồi ý, nay còn tụ tập siêu đông ntn", &Price{Name: "ＮＴＮ", FullName: "ＮＴＮ"}))
+	fmt.Println(true,HasReference("おかげでH2Oリテイ、高島屋、Jフロント", &Price{Name: "Ｈ２Ｏリテイ", FullName: "エイチ・ツー・オーリテイリング"}))
 	fmt.Println(Integrate([]Possibility{Possibility{1: 1, 2: 1}, {2: 1, 3: 2}}))
 	fmt.Println(Correlation(Possibility{1: 0.5, 2: 0.5}, Possibility{2: 0.5, 3: 0.5}))
 	fmt.Println(UserPossibility(&users[0], markets[0].Prices, time.Now(), false))
 	fmt.Println(MarketPossibility(markets[0].Prices))
 	Prediction(users, markets,false)
-	fmt.Println()
 }

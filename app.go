@@ -36,7 +36,8 @@ func main() {
 		},"index.html")
 	})
 	if false {
-		UpdatePrediction(true,false,1)
+		TestTwitter()
+		//UpdatePrediction(true,false,1)
 	} else {
 		Listen()
 	}
