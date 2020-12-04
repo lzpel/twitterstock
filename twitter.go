@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/ChimeraCoder/anaconda"
+	"golang.org/x/text/unicode/norm"
 	"math"
 	"math/rand"
 	"net/url"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 )
 
 /// @file
@@ -22,7 +24,6 @@ import (
 const (
 	SeedUserId  = 1086060182860292096 //ぱちょ@h2bl0cker_
 	UsersLimit  = 50
-	IgnoreWords = "楽天トレンドサイバーハウス平和ローソングリー武田イオンソニー"
 	//株価と関係ないツイートの例
 	//楽天証券 サイバーマンデー ホワイトハウス 平和賞 #ローソンから一足早くお届け #武田愛奈 ライオン アンソニー・ファウチ所長
 )
@@ -78,6 +79,41 @@ func Daily(t time.Time) time.Time {
 	return time.Date(t.Year(), t.Month(), t.Day(), PREDICT_HOUR, 0, 0, 0, time.Local)
 }
 
+func HasReference(s string,p*Price) bool{
+	FormatString:=func(s string) string{
+		//空文字列
+		if len(s)==0{
+			return "空文字列含有判定回避"
+		}
+		//全角英数字
+		return strings.ToUpper(string(norm.NFKC.Bytes([]byte(s))))
+	}
+	IsValid:=func(s string) bool{
+		const IgnoreWords = "楽天トレンドサイバーハウス平和ローソングリー武田イオンソニー"
+		score:=0
+		for _,c:=range s{
+			if (c >= 'A' && c <= 'Z')||(c >= '0' && c <= '9'){
+				score+=75// 300/4==75
+			}
+			if unicode.In(c, unicode.Hiragana)||unicode.In(c, unicode.Katakana){
+				score+=75
+			}
+			score+=100
+		}
+		if strings.Contains(IgnoreWords,s){
+			score=0
+		}
+		return score>=300
+	}
+	tw,ns,nl:=FormatString(s),FormatString(p.Name),FormatString(p.FullName)
+	if strings.Contains(tw, ns) || strings.Contains(tw, nl) {
+		if IsValid(ns) && IsValid(nl){
+			return true
+		}
+	}
+	return false
+}
+
 /// @fn
 /// time.Localで指定された時間帯でtimeを含む一日につぶやかれたUserのツイートから確率分布を抽出する
 func UserPossibility(user *User, dict []Price, day time.Time, useCache bool) Possibility {
@@ -105,16 +141,9 @@ func UserPossibility(user *User, dict []Price, day time.Time, useCache bool) Pos
 		for _, tweet := range tweets {
 			PredictId(&tweet, 0)
 			for _, p := range dict {
-				if len(p.FullName)==0{
-					p.FullName="空文字列含有判定回避"
+				if HasReference(tweet.FullText, p) {
+					r[p.Code] += 1
 				}
-				if false == (strings.Contains(tweet.FullText, p.Name) || strings.Contains(tweet.FullText, p.FullName)) {
-					continue
-				}
-				if true == (strings.Contains(IgnoreWords, p.Name) || strings.Contains(IgnoreWords, p.Name)) {
-					continue
-				}
-				r[p.Code] += 1
 			}
 		}
 		//正規化
