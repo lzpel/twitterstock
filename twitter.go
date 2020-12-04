@@ -89,7 +89,7 @@ func HasReference(s string,p*Price) bool{
 		return strings.ToUpper(string(norm.NFKC.Bytes([]byte(s))))
 	}
 	IsValid:=func(s string) bool{
-		const IgnoreWords = "楽天トレンドサイバーハウス平和ローソングリー武田イオンソニー"
+		const IgnoreWords = "トレンドサイバーローソン"
 		score:=0
 		for _,c:=range s{
 			if (c >= 'A' && c <= 'Z')||(c >= '0' && c <= '9'){
@@ -141,7 +141,7 @@ func UserPossibility(user *User, dict []Price, day time.Time, useCache bool) Pos
 		for _, tweet := range tweets {
 			PredictId(&tweet, 0)
 			for _, p := range dict {
-				if HasReference(tweet.FullText, p) {
+				if HasReference(tweet.FullText, &p) {
 					r[p.Code] += 1
 				}
 			}
