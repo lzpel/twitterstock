@@ -17,6 +17,9 @@ func main() {
 		fmt.Fprintln(w,"<a href='/'>back</a>")
 	})
 	Handle("/", func(w Response, r Request) {
+		if ServeFile(w,r,r.URL.Path,true){
+			return
+		}
 		markets := make([]Market, 0, 1)
 		TableGetAll(NewQuery("MARKET").Limit(cap(markets)).Order("-Born"), &markets)
 		predicts := make([]Predict, 0, 1)

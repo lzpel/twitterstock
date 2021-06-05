@@ -9,6 +9,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"text/template"
@@ -23,8 +24,12 @@ func Handle(pattern string, handler func(w Response, r Request)) {
 	http.HandleFunc(pattern, handler)
 }
 
-func ServeFile(w Response, r Request, filePath string) {
-	http.ServeFile(w, r, filePath)
+func ServeFile(w Response, r Request, filePath string, extCheck bool) bool{
+	if extCheck ==false || filepath.Ext(filePath)!=""{
+		http.ServeFile(w, r, strings.TrimLeft(filePath,"/"))
+		return true
+	}
+	return false
 }
 
 func HandleSample() {
