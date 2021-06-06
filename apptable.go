@@ -55,6 +55,15 @@ func TableGetAll(q *datastore.Query, v interface{}) []*datastore.Key {
 	}
 	return nil
 }
+func TableDeleteAll(keys []*datastore.Key) error{
+	if c, x := NewClient(); c != nil {
+		defer c.Close()
+		if err := c.DeleteMulti(x,keys); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 func TableCount(q *datastore.Query) int {
 	if c, x := NewClient(); c != nil {
 		defer c.Close()

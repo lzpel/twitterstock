@@ -2,13 +2,15 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
 	"time"
 )
 
 func main() {
 	time.Local, _ = time.LoadLocation("Asia/Tokyo")
 	Credentialize("service.json")
+	TestTwitter()
+	return
+	UpdatePrediction(false,true,1)
 	Handle("/market/update", func(w Response, r Request) {
 		UpdateMarket()
 	})
@@ -27,16 +29,7 @@ func main() {
 		WriteTemplate(w,map[string]interface{}{
 			"Market":markets[0],
 			"Predict":predicts[0],
-		}, map[string]interface{}{
-			"ToData":func(j Json)Possibility{
-				r:=Possibility{}
-				ToData(&r,j)
-				return r
-			},
-			"Rand":func()int{
-				return rand.Intn(1000)
-			},
-		},"index.html")
+		}, nil,"index.html")
 	})
 	if false {
 		TestTwitter()
@@ -50,11 +43,34 @@ func UpdateMarket() {
 		TablePut(NewKey("MARKET"), market)
 	}
 }
+func ClearPrediction(){
+	for true{
+		keys:=TableGetAll(NewQuery("PREDICT").Limit(1000).Order("-Born").KeysOnly(), nil)
+		if keys==nil||len(keys)==0{
+			break
+		}
+		TableDeleteAll(keys)
+		time.Sleep(time.Second)
+	}
+}
 func UpdatePrediction(put bool,useCache bool,count int) Predict{
 	markets := make([]Market, 0, 5)
 	TableGetAll(NewQuery("MARKET").Limit(cap(markets)).Order("-Born"), &markets)
 	predicts := make([]Predict, 0, 1)
 	TableGetAll(NewQuery("PREDICT").Limit(cap(predicts)).Order("-Born"), &predicts)
+	if len(predicts)==0{
+		predicts=append(predicts,Predict{
+			Born:Daily(time.Now()),
+			Users:[]User{
+				User{
+					Screen:"masahrhz",
+					Id:2852732372,
+					Name:"まさ",
+				},
+			},
+			Prices:[]Price{},
+		})
+	}
 	predict:=predicts[0]
 	for i:=0;i<count;i++{
 		predict = Prediction(predict.Users, markets,useCache)
