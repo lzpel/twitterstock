@@ -24,9 +24,8 @@ type Market struct {
 type User struct {
 	Id           int
 	Screen, Name string
-	//ツイート番号と株価番号の組
-	MentionTime []time.Time
 	Mention      []int64
+	//（キャッシュ時刻のUnix秒（存在確認と寿命管理にのみ使う）:6byte、株価番号:2byte）、ツイートID：8byteの組。番兵含む
 	Coefficient  float64
 }
 
