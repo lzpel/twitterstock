@@ -116,54 +116,6 @@ func HasReference(s string, p *Price) bool {
 	return false
 }
 
-/// @fn
-/// timeの日の相場を予言するツイートと言及株式番号を取得
-func UserMention(user *User, dict []Price, day time.Time, useCache bool) {
-	fmt.Println("UserMention", user.Id)
-	day = Daily(day)
-	if useCache {
-		for _, v := range user.Mention {
-			if (v >> 16) == day.Unix() {
-				fmt.Println("Cached")
-				return
-			}
-		}
-	}
-	//仮Mention
-	Mention := user.Mention
-	if Mention == nil {
-		Mention = make([]int64, 0, 32)
-	}
-	//番兵とツイート追加追加
-	Mention = append(Mention, day.Unix()<<16+int64(0), 0)
-	v := url.Values{}
-	v.Set("user_id", strconv.Itoa(user.Id))
-	v.Set("max_id", strconv.FormatInt(PredictTweetTime(0, day.Unix()), 10))
-	v.Set("since_id", strconv.FormatInt(PredictTweetTime(0, day.Add(-24*time.Hour).Unix()), 10))
-	v.Set("count", strconv.Itoa(200))
-	v.Set("exclude_replies", "false")
-	if tweets, err := NewApi().GetUserTimeline(v); err != nil {
-		fmt.Printf("no tweets https://twitter.com/intent/user?user_id=%v\n", user.Id)
-	} else {
-		for _, tweet := range tweets {
-			PredictTweetTimeUpdate(&tweet)
-			for _, p := range dict {
-				if HasReference(tweet.FullText, &p) {
-					Mention = append(Mention, day.Unix()<<16+int64(p.Code), tweet.Id)
-				}
-			}
-		}
-	}
-	//寿命と保存
-	user.Mention = make([]int64, 0, len(Mention))
-	MinTime := time.Now().Add(- time.Hour * 24 * 5)
-	for k := 0; k < len(Mention); k += 2 {
-		if (Mention[k] >> 16) > MinTime.Unix() {
-			user.Mention = append(user.Mention, Mention[k], Mention[k+1])
-		}
-	}
-}
-
 func IsValidPrice(v *Price) bool {
 	//浮動小数点読み込みミスを暫定的に除外
 	if v.Close > 10 && v.Open > 10 {
@@ -176,25 +128,81 @@ func IsValidPrice(v *Price) bool {
 	return false
 }
 
-//tから24時間前までの言及行列を返す
-func Vars(users []User, day time.Time) map[int][]float64 {
-	day = Daily(day)
-	MinID, MaxID := PredictTweetTime(0, day.Add(-time.Hour*24).Unix()), PredictTweetTime(0, day.Unix())
-	data := map[int][]float64{}
-	for k, u := range users {
-		for i := 0; i < len(u.Mention); i += 2 {
-			_, code, id := u.Mention[i]>>16, int(u.Mention[i]&0xffff), u.Mention[i+1]
-			if MinID < id && id < MaxID && code != 0 {
-				vars, ok := data[code]
-				if ok == false {
-					vars = make([]float64, len(users))
-				}
-				vars[k] = 1
-				data[code] = vars
-			}
+func UserMentionVector(users []User,k int,dict []Price,dayUnix,minID, maxID, maxAge int64,output map[int][]float64){
+	u,cacheSkip:=&users[k],false
+	for _, v := range u.Mention {
+		if (v >> 16) == dayUnix {
+			fmt.Println("Cached")
+			cacheSkip=true
+			break
 		}
 	}
-	return data
+	if cacheSkip==false{
+		u.Mention = append(u.Mention, dayUnix<<16+int64(0), 0)
+		v := url.Values{}
+		v.Set("user_id", strconv.Itoa(u.Id))
+		v.Set("max_id", strconv.FormatInt(maxID, 10))
+		v.Set("since_id", strconv.FormatInt(minID, 10))
+		v.Set("count", strconv.Itoa(200))
+		v.Set("exclude_replies", "false")
+		if tweets, err := NewApi().GetUserTimeline(v); err != nil {
+			fmt.Printf("no tweets https://twitter.com/intent/user?user_id=%v\n", u.Id)
+		} else {
+			for _, tweet := range tweets {
+				PredictTweetTimeUpdate(&tweet)
+				for _, p := range dict {
+					if HasReference(tweet.FullText, &p) {
+						u.Mention = append(u.Mention, dayUnix<<16+int64(p.Code), tweet.Id)
+					}
+				}
+			}
+		}
+		fmt.Println(u.Name,"Done")
+	}else{
+		fmt.Println(u.Name,"Skipped")
+	}
+	Mention:= make([]int64, 0, len(u.Mention))
+	for i := 0; i < len(u.Mention); i += 2 {
+		unix, code, id := u.Mention[i]>>16, int(u.Mention[i]&0xffff), u.Mention[i+1]
+		if minID < id && id < maxID && code != 0 {
+			vars, ok := output[code]
+			if ok == false {
+				vars = make([]float64, len(users))
+			}
+			vars[k] = 1.0
+			output[code] = vars
+		}
+		if unix>maxAge{
+			Mention=append(Mention,u.Mention[i],u.Mention[i+1])
+		}
+	}
+	u.Mention=Mention
+}
+
+func UserMentionVectors(users []User, dict []Price, day time.Time)(map[int][]float64,map[int]*Price){
+	// X行列
+	day = Daily(day)
+	MinID, MaxID := PredictTweetTime(0, day.Add(-time.Hour*24).Unix()), PredictTweetTime(0, day.Unix())
+	MaxAge := time.Now().Add(- time.Hour * 24 * 5)
+	output := map[int][]float64{}
+	wg := &sync.WaitGroup{}
+	for k, _ := range users {
+		wg.Add(1)
+		//TODO: go func
+		func(){
+			defer wg.Done()
+			UserMentionVector(users,k,dict,day.Unix(),MinID,MaxID,MaxAge.Unix(), output)
+		}()
+	}
+	wg.Wait()
+	// Yベクトル
+	prices:=map[int]*Price{}
+	for k,_:=range dict{
+		if IsValidPrice(&dict[k]) {
+			prices[dict[k].Code] = &dict[k]
+		}
+	}
+	return output,prices
 }
 
 /// @fn
@@ -204,29 +212,19 @@ func Train(users []User, markets []Market, predict []Price, future time.Time) {
 	for k, u := range users {
 		r.SetVar(k, u.Name)
 	}
-	XY:=func(us []User,pr []Price, ft time.Time) (map[int][]float64,map[int]*Price){
-		vars,prices := Vars(us, ft),map[int]*Price{}
-		for k,_:=range pr{
-			if IsValidPrice(&pr[k]) {
-				prices[pr[k].Code] = &pr[k]
-			}
-		}
-		return vars,prices
-	}
 	for _, m := range markets {
-		vars,prices := XY(users,m.Prices,m.Born)
+		vars,prices := UserMentionVectors(users,m.Prices,m.Born)
 		for k, d := range vars {
 			if p, ok := prices[k]; ok == true {
 				r.Train(regression.DataPoint(p.Value, d))
 			}
 		}
 	}
-	vars,prices := XY(users,future)
+	vars,prices := UserMentionVectors(users,predict,future)
 	r.Run()
 	for k, v := range vars {
 		var e error
 		if prices[k].Value, e = r.Predict(v); e != nil {
-			//二行以上のデータが無いと不正。
 			prices[k].Value = 0
 		}
 	}
@@ -239,30 +237,16 @@ func Train(users []User, markets []Market, predict []Price, future time.Time) {
 /// ユーザーリストを更新し、予測する
 func Prediction(users []User, markets []Market, prices []Price, future time.Time, useCache bool) Predict {
 	//最後は予測
+	// TODO: Deep Copy
 	predict := Predict{
 		Born: Daily(future),
+		Users: users,
+		Prices: prices,
 	}
-	// TODO: Deep Copy
-	copy(predict.Users,users)
-	copy(predict.Prices, prices)
 	//追加：2割増し
 	AppendUsers(predict.Users, UsersLimit/5)
-	//非同期キャッシュ
-	// TODO: predictもキャッシュしないといけない
-	wg := &sync.WaitGroup{}
-	for i, _ := range predict.Users {
-		wg.Add(1)
-		// TODO: go func に変更
-		func(u *User, ms []Market) {
-			defer wg.Done()
-			for _, m := range ms {
-				UserMention(u, m.Prices, m.Born, useCache)
-			}
-		}(&predict.Users[i], markets)
-	}
-	wg.Wait()
 	//学習と予測
-	Train(users, markets, predict.Prices)
+	Train(predict.Users, markets, predict.Prices,predict.Born)
 	//厳選
 	sort.Slice(predict.Users, func(i, j int) bool { return predict.Users[i].Coefficient > predict.Users[j].Coefficient })
 	sort.Slice(predict.Prices, func(i, j int) bool { return predict.Prices[i].Value > predict.Prices[j].Value })
@@ -340,6 +324,13 @@ func TestTwitter() {
 					Open:     100,
 					Close:    120,
 				},
+				{
+					Code:   102,
+					Name:   "部分和問題",
+					FullName: "行列累乗",
+					Open:     100,
+					Close:    130,
+				},
 			},
 		},
 	}
@@ -350,11 +341,6 @@ func TestTwitter() {
 	fmt.Println(225, false, HasReference("lại rồi ý, nay còn tụ tập siêu đông ntn", &Price{Name: "ＮＴＮ", FullName: "ＮＴＮ"}))
 	fmt.Println(450, true, HasReference("おかげでH2Oリテイ、高島屋、Jフロント", &Price{Name: "Ｈ２Ｏリテイ", FullName: "エイチ・ツー・オーリテイリング"}))
 	fmt.Println(time.Unix(PredictTweetTime(1401567948079190019, 0), 0).String(), "午前0:53 · 2021年6月7日")
-	UserMention(&users[0], markets[0].Prices, markets[0].Born, true)
-	fmt.Println("reuse Cache")
-	UserMention(&users[0], markets[0].Prices, markets[0].Born, true)
-	UserMention(&users[1], markets[0].Prices, markets[0].Born, true)
-	fmt.Println(users[0].Mention)
-	fmt.Println(Vars(users, markets[0].Born))
+	fmt.Println(UserMentionVectors(users, markets[0].Prices, markets[0].Born))
 	Prediction(users, markets, markets[0].Prices ,markets[0].Born,true)
 }
