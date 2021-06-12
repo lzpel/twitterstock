@@ -25,7 +25,7 @@ import (
 const (
 	SeedUserId = 1086060182860292096 //ぱちょ@h2bl0cker_
 	UsersLimit = 50
-	CacheAge   = time.Hour * 24 * 5
+	CacheAge   = time.Hour * 24 * 10
 	//株価と関係ないツイートの例
 	//楽天証券 サイバーマンデー ホワイトハウス 平和賞 #ローソンから一足早くお届け #武田愛奈 ライオン アンソニー・ファウチ所長
 )
@@ -134,7 +134,6 @@ func MentionUser(user *User, prices map[int]*Price, day, age time.Time, output m
 	cacheSkip := false
 	for _, v := range user.Mention {
 		if (v >> 16) == day.Unix() {
-			fmt.Println("Cached")
 			cacheSkip = true
 			break
 		}
@@ -215,8 +214,7 @@ func Train(users []User, markets []Market, future time.Time) []Price{
 		Mention(users, markets[k].Prices, markets[k].Born, mentionMap)
 	}
 	//逆にmarkets[n].Pricesとpredictは別領域である必要がある。
-	var futurePrices []Price
-	copy(futurePrices,markets[0].Prices)
+	futurePrices:=append([]Price{},markets[0].Prices...)
 	Mention(users,futurePrices,future,mentionMap)
 	for k, _ :=range futurePrices{
 		futurePrices[k].High=-1
@@ -243,13 +241,14 @@ func Train(users []User, markets []Market, future time.Time) []Price{
 		for _,n:=range m{
 			v[usersMap[n]]=1.0
 		}
-		if k.High>0{
+		if k.High>=0{
 			r.Train(regression.DataPoint(k.Value,v))
 		}else{
 			predict[k]=v
 		}
 	}
 	r.Run()
+	fmt.Println(r.Formula)
 	for k, m := range usersMap {
 		k.Coefficient = r.Coeff(m + 1)
 	}
@@ -355,10 +354,10 @@ func TestTwitter() {
 				},
 				{
 					Code:     102,
-					Name:     "部分和問題",
-					FullName: "行列累乗",
+					Name:     "誕生日",
+					FullName: "ABC全",
 					Open:     100,
-					Close:    130,
+					Close:    100,
 				},
 			},
 		},
@@ -367,10 +366,9 @@ func TestTwitter() {
 	r.SetObserved("説明変数N+定数項1<=データ量")
 	r.SetVar(0, "#1")
 	r.SetVar(1, "#2")
-	r.Train(regression.DataPoint(1.0, []float64{1.0, 0, 0}))
-	r.Train(regression.DataPoint(2.0, []float64{0, 1.0, 0}))
-	r.Train(regression.DataPoint(4.0, []float64{1.0, 0, 1.0}))
-	r.Train(regression.DataPoint(0.0, []float64{0.0, 0, 0.0}))
+	r.Train(regression.DataPoint(0.1, []float64{1, 0}))
+	r.Train(regression.DataPoint(0.2, []float64{0, 1}))
+	r.Train(regression.DataPoint(0.3, []float64{1, 1}))
 	r.Run()
 	fmt.Println(r.Formula)
 	fmt.Println(225, false, HasReference("メタボリックシンドローム", &Price{Name: "ローム", FullName: "ローム"}))
