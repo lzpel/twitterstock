@@ -9,8 +9,6 @@ import (
 func main() {
 	time.Local, _ = time.LoadLocation("Asia/Tokyo")
 	Credentialize("service.json")
-	UpdatePrediction(true, true, 1)
-	return
 	Handle("/market/update", func(w Response, r Request) {
 		UpdateMarket()
 	})
@@ -36,8 +34,8 @@ func main() {
 		}, "index.html")
 	})
 	if false {
-		TestTwitter()
-		//UpdatePrediction(true,false,1)
+		//TestTwitter()
+		UpdatePrediction(true,true,1)
 	} else {
 		Listen()
 	}
