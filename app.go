@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
 	"time"
 )
 
@@ -28,17 +27,26 @@ func main() {
 			"Market":  markets,
 			"Predict": predicts,
 		}, Dict{
-			"Rand":func()int{
-				return rand.Intn(1000)
+			"Local": func(t time.Time) string {
+				return t.In(time.Local).Format("2006-01-02 15:04")
 			},
 		}, "index.html")
 	})
 	if false {
 		//TestTwitter()
-		UpdatePrediction(true,true,1)
+		UpdatePrediction(true, true, 1)
 	} else {
 		Listen()
 	}
+}
+func (p*Price) Percent() string {
+	return fmt.Sprintf("%+.2f%%", p.Value*100)
+}
+func (p*User) CoefficientFormatted() string {
+	return fmt.Sprintf("%+.5f", p.Coefficient)
+}
+func (p*Predict) Local() time.Time {
+	return p.Born.In(time.Local)
 }
 func UpdateMarket() {
 	if market := FetchMarket(); market != nil {
@@ -80,7 +88,7 @@ func UpdatePrediction(put bool, useCache bool, count int) Predict {
 		if put {
 			TablePut(predict.Key(), &predict)
 		}
-		predicts[0]=predict
+		predicts[0] = predict
 	}
 	return predict
 }

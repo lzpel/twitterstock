@@ -1,64 +1,74 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="jp">
 <head>
-    <meta charset="UTF-8">
-    <title>Twitter stock</title>
-	<link rel="stylesheet" href="https://unpkg.com/purecss@2.0.6/build/pure-min.css" integrity="sha384-Uu6IeWbM+gzNVXJcM9XV3SohHtmWE+3VGi496jvgX1jyvDTXfdK+rfZc8C1Aehk5" crossorigin="anonymous">
+	<meta charset="UTF-8">
+	<title>鳥株予報</title>
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/css/bootstrap.min.css" rel="stylesheet"
+		  integrity="sha384-+0n0xVW2eSR5OomGNYDnhzAbDsOXxcvSN1TPprVMTNDbiYZCxYbOOl7+AMvyTG2x" crossorigin="anonymous">
 </head>
 <body>
-<img src="/logo.svg" class="pure-img">
+<h1 class="display-3">鳥株予報</h1>
+<p>個人投資家のツイートから東証一部上場銘柄への言及を拾い、重回帰分析により未来の株価を予測するシステム</p>
+<a href="https://lzpel.net">© 2021 lzpel</a>
 {{range .Predict}}
-<table class="pure-table">
+<h2 class="display-5">予報 {{.Born | Local}}</h2>
+<p>毎日午前8時更新。当日の取引時間中の値動きを予測。</p>
+<table class="table">
 	<tr>
 		<th>証券番号</th>
 		<th>銘柄略称</th>
 		<th>銘柄名</th>
-		<th>本日の相対変位予測</th>
+		<th>予測</th>
 	</tr>
 {{range .Prices}}
 	<tr id="{{.Code}}">
 		<td>#{{.Code}}</td>
 		<td>{{.Name}}</td>
 		<td>{{.FullName}}</td>
-		<td>{{.Value}}</td>
+		<td>{{.Percent}}</td>
 	</tr>
 {{end}}
 </table>
-<table class="pure-table">
+<table class="table">
 	<tr>
-		<th>名前</th>
+		<th>#</th>
+		<th>個人投資家Twitter</th>
 		<th>ID</th>
-		<th>変動率係数</th>
+		<th>係数</th>
 	</tr>
-{{range .Users}}
-	<tr id="{{.Id}}">
-		<td>{{.Name}}</td>
-		<td>{{.Screen}}</td>
-		<td>{{.Coefficient}}</td>
+{{range $i, $u := .Users}}
+	<tr id="{{$u.Id}}">
+		<td>{{$i}}</td>
+		<td style="overflow:hidden;">
+			<a href="https://twitter.com/{{$u.Screen}}"
+			   style="text-overflow:ellipsis;width:100px;white-space:nowrap;">{{$u.Name}}</a>
+		</td>
+		<td>@{{$u.Screen}}</td>
+		<td>{{$u.CoefficientFormatted}}</td>
 	</tr>
 {{end}}
 </table>
 {{end}}
 {{range .Market}}
-<p>株価取得日時：{{.Born}}</p>
+<h2 class="display-5">株価 {{.Born | Local}}</h2>
 <p>株価取得個数：{{.Prices | len}}</p>
-<table class="pure-table">
-    <tr>
-        <th>証券番号</th>
-        <th>銘柄略称</th>
-        <th>銘柄名</th>
-        <th>始値</th>
-        <th>終値</th>
-    </tr>
-    {{range .Prices}}
-        <tr id="{{.Code}}">
-            <td>#{{.Code}}</td>
-            <td>{{.Name}}</td>
-            <td>{{.FullName}}</td>
-            <td>{{.Open}}</td>
-            <td>{{.Close}}</td>
-        </tr>
-    {{end}}
+<table class="table">
+	<tr>
+		<th>証券番号</th>
+		<th>銘柄略称</th>
+		<th>銘柄名</th>
+		<th>始値</th>
+		<th>終値</th>
+	</tr>
+{{range .Prices}}
+	<tr id="{{.Code}}">
+		<td>#{{.Code}}</td>
+		<td>{{.Name}}</td>
+		<td>{{.FullName}}</td>
+		<td>{{.Open}}</td>
+		<td>{{.Close}}</td>
+	</tr>
+{{end}}
 </table>
 {{end}}
 </body>

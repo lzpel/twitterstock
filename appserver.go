@@ -74,7 +74,7 @@ func Listen() {
 	}
 }
 
-func WriteTemplate(w io.Writer, value interface{}, funcMap map[string]interface{}, filename ...string, ) {
+func WriteTemplate(w io.Writer, value interface{}, funcMap template.FuncMap, filename ...string, ) {
 	if t, e := template.New(filename[0]).Funcs(funcMap).ParseFiles(filename...); e == nil {
 		e = t.Execute(w, value)
 	}else{

@@ -82,7 +82,7 @@ func PredictTweetTimeUpdate(v *anaconda.Tweet) {
 
 func Daily(t time.Time) time.Time {
 	// 東証の取引時間は現在、午前９時―午後３時で、途中１時間の休憩が入る。
-	const PredictHour = 8
+	const PredictHour = 6
 	t = t.In(time.Local).Add(-time.Hour * time.Duration(PredictHour))
 	return time.Date(t.Year(), t.Month(), t.Day(), PredictHour, 0, 0, 0, time.Local)
 }
@@ -129,7 +129,7 @@ func IsValidPrice(v *Price) bool {
 	return false
 }
 
-func MentionUser(user *User, prices map[int]*Price, output map[*Price][]*User, day, age time.Time, wg *sync.WaitGroup) {
+func MentionUser(user *User, prices map[int]*Price, output map[*Price][]*User, day, age time.Time,mu *sync.Mutex, wg *sync.WaitGroup) {
 	if wg != nil {
 		defer wg.Done()
 	}
@@ -172,9 +172,15 @@ func MentionUser(user *User, prices map[int]*Price, output map[*Price][]*User, d
 			Mention = append(Mention, user.Mention[i], user.Mention[i+1])
 			if minID < id && id < maxID && code != 0 {
 				if price, ok := prices[code]; ok {
+					//メモリをロックしてから書き込む
+					if mu!=nil{
+						mu.Lock()
+					}
 					vars, _ := output[price]
-					vars = append(vars, user)
-					output[price] = vars
+					output[price] = append(vars, user)
+					if mu!=nil{
+						mu.Unlock()
+					}
 				} else {
 					//新規上場銘柄への言及などで到達する可能性がある
 					fmt.Println("No price", code)
@@ -197,9 +203,10 @@ func Mention(users []User, prices []Price, day time.Time, mentionMap map[*Price]
 	day = Daily(day)
 	age := time.Now().Add(- CacheAge)
 	wg := &sync.WaitGroup{}
+	mu := &sync.Mutex{}
 	for k, _ := range users {
 		wg.Add(1)
-		go MentionUser(&users[k], pricesMap, mentionMap, day, age, wg)
+		go MentionUser(&users[k], pricesMap, mentionMap, day, age, mu, wg)
 	}
 	wg.Wait()
 }
@@ -212,12 +219,20 @@ func Train(users []User, markets []Market, future time.Time) ([]User, []Price) {
 	for k, _ := range markets {
 		Mention(users, markets[k].Prices, markets[k].Born, mentionMap)
 	}
+	//逆写像
+	mentionReverseMap := map[*User][]*Price{}
+	for k, m := range mentionMap {
+		for _, n := range m {
+			mentionReverseMap[n] = append(mentionReverseMap[n], k)
+		}
+	}
 	//言及の人物列挙
 	usersMap := map[*User]int{}
-	for _, m := range mentionMap {
-		for _, n := range m {
-			if _, ok := usersMap[n]; ok == false {
-				usersMap[n] = len(usersMap)
+	for k, m := range mentionReverseMap {
+		//複数の株価言及を条件とする
+		if len(m) >= 2 {
+			if _, ok := usersMap[k]; ok == false {
+				usersMap[k] = len(usersMap)
 			}
 		}
 	}
@@ -240,7 +255,7 @@ func Train(users []User, markets []Market, future time.Time) ([]User, []Price) {
 		for _, n := range m {
 			if idx, ok := usersMap[n]; ok {
 				//乱数を用いて線形従属ベクトルによる係数発散を避ける
-				v[idx] = 1.0+rand.Float64()/10
+				v[idx] = 1.0 + rand.Float64()/10
 			} else {
 				//ここに到達する場合、nは過去の言及が無く未来の言及が有るユーザー
 				//NaN係数を避けるため無視する
@@ -269,7 +284,7 @@ func Train(users []User, markets []Market, future time.Time) ([]User, []Price) {
 		fmt.Println(k.Name, k.Value, m)
 		futurePrices = append(futurePrices, *k)
 	}
-	sort.Slice(futureUsers, func(i, j int) bool {return futureUsers[i].Coefficient > futureUsers[j].Coefficient})
+	sort.Slice(futureUsers, func(i, j int) bool { return futureUsers[i].Coefficient > futureUsers[j].Coefficient })
 	sort.Slice(futurePrices, func(i, j int) bool { return futurePrices[i].Value > futurePrices[j].Value })
 	return futureUsers, futurePrices
 }
@@ -297,8 +312,7 @@ func Prediction(users []User, markets []Market, prices []Price, future time.Time
 /// @fn 追加する
 func AppendUsers(users []User, maxLength int) []User {
 	const (
-		CountCursor    = 100
-		CountCandidate = CountCursor * 3
+		CountCursor = 100
 	)
 	rand.Seed(time.Now().UnixNano())
 	result := map[int]*User{}
@@ -306,31 +320,31 @@ func AppendUsers(users []User, maxLength int) []User {
 		result[users[k].Id] = &users[k]
 	}
 	stock := map[int]*User{}
+	count := 0
 	for _, user := range result {
-		if len(stock) >= CountCandidate {
-			break
-		}
-		// フォローを抽出
-		v := url.Values{}
-		if user.Id != 0 {
-			v.Set("user_id", strconv.Itoa(user.Id))
-		} else {
-			v.Set("screen_name", user.Screen)
-		}
-		v.Set("count", strconv.Itoa(CountCursor))
-		v.Set("skip_status", "true")
-		v.Set("include_user_entities", "false")
-		if cursor, err := NewApi().GetFriendsList(v); err != nil {
-			fmt.Printf("no friends", user.Name, user.Screen, user.Id)
-		} else {
-			for _, v := range cursor.Users {
-				if v.Protected == false {
-					u := User{
-						Id:     int(v.Id),
-						Screen: v.ScreenName,
-						Name:   v.Name,
+		if count += 1; count <= 2 {
+			// フォローを抽出
+			v := url.Values{}
+			if user.Id != 0 {
+				v.Set("user_id", strconv.Itoa(user.Id))
+			} else {
+				v.Set("screen_name", user.Screen)
+			}
+			v.Set("count", strconv.Itoa(CountCursor))
+			v.Set("skip_status", "true")
+			v.Set("include_user_entities", "false")
+			if cursor, err := NewApi().GetFriendsList(v); err != nil {
+				fmt.Printf("no friends", user.Name, user.Screen, user.Id)
+			} else {
+				for _, v := range cursor.Users {
+					if v.Protected == false {
+						u := User{
+							Id:     int(v.Id),
+							Screen: v.ScreenName,
+							Name:   v.Name,
+						}
+						stock[u.Id] = &u
 					}
-					stock[u.Id] = &u
 				}
 			}
 		}
