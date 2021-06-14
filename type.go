@@ -30,8 +30,11 @@ type User struct {
 }
 
 type Predict struct {
-	Self   *datastore.Key `datastore:"__key__"`
 	Born   time.Time
 	Users  []User `datastore:",noindex"`
 	Prices []Price
+}
+
+func (p*Predict) Key() *datastore.Key{
+	return NewIdKey("PREDICT",p.Born.Unix())
 }

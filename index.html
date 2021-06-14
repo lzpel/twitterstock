@@ -3,32 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <title>Twitter stock</title>
+	<link rel="stylesheet" href="https://unpkg.com/purecss@2.0.6/build/pure-min.css" integrity="sha384-Uu6IeWbM+gzNVXJcM9XV3SohHtmWE+3VGi496jvgX1jyvDTXfdK+rfZc8C1Aehk5" crossorigin="anonymous">
 </head>
 <body>
-<img src="/logo.svg">
-<a href='/twitter/update?r={{Rand}}'>update</a>
-<p>株価取得日時：{{.Market.Born}}</p>
-<p>株価取得個数：{{.Market.Prices | len}}</p>
-<table>
-    {{$Codes := .Predict.CodesPossibility | ToData}}
-    {{range .Predict.Codes}}
-    <tr>
-        <td><a href='#{{.}}'>#{{.}}</a></td>
-        <td>{{ index $Codes . }}</td>
-    </tr>
-    {{end}}
+<img src="/logo.svg" class="pure-img">
+<a href='/twitter/update?r={{Rand}}' class="pure-button">update</a>
+{{range .Predict}}
+<table class="pure-table">
+	<tr>
+		<th>証券番号</th>
+		<th>銘柄略称</th>
+		<th>銘柄名</th>
+		<th>本日の相対変位予測</th>
+	</tr>
+{{range .Prices}}
+	<tr id="{{.Code}}">
+		<td>#{{.Code}}</td>
+		<td>{{.Name}}</td>
+		<td>{{.FullName}}</td>
+		<td>{{.Value}}</td>
+	</tr>
+{{end}}
 </table>
-<table>
-    {{$Users := .Predict.UsersPossibility | ToData}}
-    {{range .Predict.Users}}
-    <tr>
-        <td><a href='https://twitter.com/intent/user?user_id={{.Id}}'>#{{.Id}}</a></td>
-        <td>{{ index $Users .Id }}</td>
-    </tr>
-    {{end}}
+<table class="pure-table">
+	<tr>
+		<th>名前</th>
+		<th>ID</th>
+		<th>変動率係数</th>
+	</tr>
+{{range .Users}}
+	<tr id="{{.Id}}">
+		<td>{{.Name}}</td>
+		<td>{{.Screen}}</td>
+		<td>{{.Coefficient}}</td>
+	</tr>
+{{end}}
 </table>
-<hr>
-<table>
+{{end}}
+{{range .Market}}
+<p>株価取得日時：{{.Born}}</p>
+<p>株価取得個数：{{.Prices | len}}</p>
+<table class="pure-table">
     <tr>
         <th>証券番号</th>
         <th>銘柄略称</th>
@@ -36,7 +51,7 @@
         <th>始値</th>
         <th>終値</th>
     </tr>
-    {{range .Market.Prices}}
+    {{range .Prices}}
         <tr id="{{.Code}}">
             <td>#{{.Code}}</td>
             <td>{{.Name}}</td>
@@ -46,12 +61,6 @@
         </tr>
     {{end}}
 </table>
-<table>
-{{range .Market.Prices}}
-    <tr>
-        <td></td>
-    </tr>
 {{end}}
-</table>
 </body>
 </html>

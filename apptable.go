@@ -22,6 +22,9 @@ func NewQuery(kind string) *datastore.Query {
 func NewKey(kind string) *datastore.Key {
 	return datastore.IncompleteKey(kind, nil)
 }
+func NewIdKey(kind string,id int64) *datastore.Key {
+	return datastore.IDKey(kind,id,nil)
+}
 func TablePut(k *datastore.Key, v interface{}) *datastore.Key {
 	if c, x := NewClient(); c != nil {
 		defer c.Close()
