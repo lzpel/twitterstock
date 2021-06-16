@@ -45,14 +45,26 @@ func main() {
 		Listen()
 	}
 }
-func (pr*Predict)Mention(p*Price) []int64{
-	v:=[]int64{}
-	for k, _:=range pr.Users{
-		m:=pr.Users[k].Mention
-		for i:=0;i<len(m);i+=2{
-			if (m[i]>>16)==pr.Born.Unix() && int(m[i]&0xffff)==p.Code{
-				v=append(v,m[i+1])
+func (pr *Predict) MentionPrice(p *Price) map[int64]string {
+	v := map[int64]string{}
+	for k, _ := range pr.Users {
+		u:=pr.Users[k]
+		m := u.Mention
+		for i := 0; i < len(m); i += 2 {
+			if (m[i]>>16) == pr.Born.Unix() && int(m[i]&0xffff) == p.Code {
+				v[m[i+1]]=u.Screen
 			}
+		}
+	}
+	return v
+}
+
+func (pr *Predict) MentionUser(u *User) map[int64]int {
+	v := map[int64]int{}
+	m := u.Mention
+	for i := 0; i < len(m); i += 2 {
+		if (m[i]>>16) == pr.Born.Unix() && int(m[i]&0xffff)!=0{
+			v[m[i+1]]=int(m[i]&0xffff)
 		}
 	}
 	return v

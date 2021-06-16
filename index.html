@@ -12,7 +12,7 @@
 <a href="https://lzpel.net">© 2021 lzpel</a>
 {{range $predict:=.Predict}}
 <h2 class="display-5">予報 {{$predict.Born | Local}}</h2>
-<p>毎日午前8時更新。当日の取引時間中の値動きを予測。</p>
+<p>毎日午前6時更新。当日の取引時間中の値動きを予測。</p>
 <table class="table">
 	<tr>
 		<th>証券番号</th>
@@ -27,7 +27,7 @@
 		<td>{{$p.Name}}</td>
 		<td>{{$p.FullName}}</td>
 		<td>{{$p.Value | Percent}}</td>
-		<td style="word-break:break-all;">{{range $predict.Mention $p}}<a target="_blank" href="https://twitter.com/twitter/status/{{.}}">*</a>{{end}}</td>
+		<td style="word-break:break-all;">{{range $i, $m := ($predict.MentionPrice $p)}}<a target="_blank" href="https://twitter.com/{{$m}}/status/{{$i}}">*</a>{{end}}</td>
 	</tr>
 {{end}}
 </table>
@@ -37,6 +37,7 @@
 		<th>個人投資家Twitter</th>
 		<th>ID</th>
 		<th>係数</th>
+		<th>ツイート</th>
 	</tr>
 {{range $i, $u := .Users}}
 	<tr id="{{$u.Id}}">
@@ -47,6 +48,7 @@
 		</td>
 		<td>@{{$u.Screen}}</td>
 		<td>{{$u.Coefficient | Coefficient}}</td>
+		<td style="word-break:break-all;">{{range $i, $m := ($predict.MentionUser $u)}}<a target="_blank" href="https://twitter.com/twitter/status/{{$i}}">{{$m}}</a>{{end}}</td>
 	</tr>
 {{end}}
 </table>
