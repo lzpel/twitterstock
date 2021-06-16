@@ -8,10 +8,10 @@ import (
 func main() {
 	time.Local, _ = time.LoadLocation("Asia/Tokyo")
 	Credentialize("service.json")
-	Handle("/market/update", func(w Response, r Request) {
+	Handle("/market", func(w Response, r Request) {
 		UpdateMarket()
 	})
-	Handle("/twitter/update", func(w Response, r Request) {
+	Handle("/twitter", func(w Response, r Request) {
 		UpdatePrediction(true, true, 1)
 		fmt.Fprintln(w, "<a href='/'>back</a>")
 	})
@@ -30,6 +30,12 @@ func main() {
 			"Local": func(t time.Time) string {
 				return t.In(time.Local).Format("2006-01-02 15:04")
 			},
+			"Coefficient": func(t float64) string {
+				return fmt.Sprintf("%+.5f", t)
+			},
+			"Percent": func(t float64) string {
+				return fmt.Sprintf("%+.2f%%", t*100)
+			},
 		}, "index.html")
 	})
 	if false {
@@ -39,28 +45,22 @@ func main() {
 		Listen()
 	}
 }
-func (p*Price) Percent() string {
-	return fmt.Sprintf("%+.2f%%", p.Value*100)
+func (pr*Predict)Mention(p*Price) []int64{
+	v:=[]int64{}
+	for k, _:=range pr.Users{
+		m:=pr.Users[k].Mention
+		for i:=0;i<len(m);i+=2{
+			if (m[i]>>16)==pr.Born.Unix() && int(m[i]&0xffff)==p.Code{
+				v=append(v,m[i+1])
+			}
+		}
+	}
+	return v
 }
-func (p*User) CoefficientFormatted() string {
-	return fmt.Sprintf("%+.5f", p.Coefficient)
-}
-func (p*Predict) Local() time.Time {
-	return p.Born.In(time.Local)
-}
+
 func UpdateMarket() {
 	if market := FetchMarket(); market != nil {
 		TablePut(NewKey("MARKET"), market)
-	}
-}
-func ClearPrediction() {
-	for true {
-		keys := TableGetAll(NewQuery("PREDICT").Limit(1000).Order("-Born").KeysOnly(), nil)
-		if keys == nil || len(keys) == 0 {
-			break
-		}
-		TableDeleteAll(keys)
-		time.Sleep(time.Second)
 	}
 }
 func UpdatePrediction(put bool, useCache bool, count int) Predict {
@@ -91,4 +91,15 @@ func UpdatePrediction(put bool, useCache bool, count int) Predict {
 		predicts[0] = predict
 	}
 	return predict
+}
+
+func ClearPrediction() {
+	for true {
+		keys := TableGetAll(NewQuery("PREDICT").Limit(1000).Order("-Born").KeysOnly(), nil)
+		if keys == nil || len(keys) == 0 {
+			break
+		}
+		TableDeleteAll(keys)
+		time.Sleep(time.Second)
+	}
 }

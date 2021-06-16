@@ -10,8 +10,8 @@
 <h1 class="display-3">鳥株予報</h1>
 <p>個人投資家のツイートから東証一部上場銘柄への言及を拾い、重回帰分析により未来の株価を予測するシステム</p>
 <a href="https://lzpel.net">© 2021 lzpel</a>
-{{range .Predict}}
-<h2 class="display-5">予報 {{.Born | Local}}</h2>
+{{range $predict:=.Predict}}
+<h2 class="display-5">予報 {{$predict.Born | Local}}</h2>
 <p>毎日午前8時更新。当日の取引時間中の値動きを予測。</p>
 <table class="table">
 	<tr>
@@ -19,13 +19,15 @@
 		<th>銘柄略称</th>
 		<th>銘柄名</th>
 		<th>予測</th>
+		<th>ツイート</th>
 	</tr>
-{{range .Prices}}
-	<tr id="{{.Code}}">
-		<td>#{{.Code}}</td>
-		<td>{{.Name}}</td>
-		<td>{{.FullName}}</td>
-		<td>{{.Percent}}</td>
+{{range $p:=$predict.Prices}}
+	<tr id="{{$p.Code}}">
+		<td>#{{$p.Code}}</td>
+		<td>{{$p.Name}}</td>
+		<td>{{$p.FullName}}</td>
+		<td>{{$p.Value | Percent}}</td>
+		<td style="word-break:break-all;">{{range $predict.Mention $p}}<a target="_blank" href="https://twitter.com/twitter/status/{{.}}">*</a>{{end}}</td>
 	</tr>
 {{end}}
 </table>
@@ -44,7 +46,7 @@
 			   style="text-overflow:ellipsis;width:100px;white-space:nowrap;">{{$u.Name}}</a>
 		</td>
 		<td>@{{$u.Screen}}</td>
-		<td>{{$u.CoefficientFormatted}}</td>
+		<td>{{$u.Coefficient | Coefficient}}</td>
 	</tr>
 {{end}}
 </table>
