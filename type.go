@@ -5,7 +5,11 @@ import (
 	"time"
 )
 
-// Do not change or commit
+const (
+	SeedUserId = 1086060182860292096 //ぱちょ@h2bl0cker_
+	UsersLimit = 100
+	CacheAge   = time.Hour * 24 * 10
+)
 
 type Price struct {
 	Name, FullName               string

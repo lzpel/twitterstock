@@ -16,20 +16,6 @@ import (
 	"unicode"
 )
 
-/// @file
-/// 日付から確率分布を算出する
-/// 相場から正解の確立分布を算出する
-/// 相関を採りランキングを更新する
-/// 学術的に意味がある簡単なデータ構造を引数や戻り値に設定すると使いまわしやすい
-
-const (
-	SeedUserId = 1086060182860292096 //ぱちょ@h2bl0cker_
-	UsersLimit = 50
-	CacheAge   = time.Hour * 24 * 10
-	//株価と関係ないツイートの例
-	//楽天証券 サイバーマンデー ホワイトハウス 平和賞 #ローソンから一足早くお届け #武田愛奈 ライオン アンソニー・ファウチ所長
-)
-
 // @fn
 // API取得
 func NewApi() *anaconda.TwitterApi {
@@ -80,6 +66,8 @@ func PredictTweetTimeUpdate(v *anaconda.Tweet) {
 	}
 }
 
+// @fn
+// 最新の特定時刻に揃えた時刻を返す
 func Daily(t time.Time) time.Time {
 	// 東証の取引時間は現在、午前９時―午後３時で、途中１時間の休憩が入る。
 	const PredictHour = 6
@@ -150,7 +138,7 @@ func MentionUser(user *User, prices map[int]*Price, output map[*Price][]*User, d
 		v.Set("count", strconv.Itoa(200))
 		v.Set("exclude_replies", "false")
 		if tweets, err := NewApi().GetUserTimeline(v); err != nil {
-			fmt.Printf("no tweets https://twitter.com/intent/user?user_id=%v\n", user.Id)
+			fmt.Printf("no tweets https://twitter.com/%v\n", user.Screen)
 		} else {
 			for _, tweet := range tweets {
 				PredictTweetTimeUpdate(&tweet)
@@ -284,7 +272,7 @@ func Train(users []User, markets []Market, future time.Time) ([]User, []Price) {
 		fmt.Println(k.Name, k.Value, m)
 		futurePrices = append(futurePrices, *k)
 	}
-	sort.Slice(futureUsers, func(i, j int) bool { return futureUsers[i].Coefficient > futureUsers[j].Coefficient })
+	sort.Slice(futureUsers, func(i, j int) bool { return math.Abs(futureUsers[i].Coefficient) > math.Abs(futureUsers[j].Coefficient) })
 	sort.Slice(futurePrices, func(i, j int) bool { return futurePrices[i].Value > futurePrices[j].Value })
 	return futureUsers, futurePrices
 }
@@ -358,6 +346,7 @@ func AppendUsers(users []User, maxLength int) []User {
 			users = append(users, *v)
 		}
 	}
+	fmt.Println("投資家候補の追加完了。現在 %v 人。",len(users))
 	return users
 }
 
