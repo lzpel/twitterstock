@@ -45,14 +45,14 @@ func main() {
 		Listen()
 	}
 }
-func (pr *Predict) MentionPrice(p *Price) map[int64]string {
-	v := map[int64]string{}
+func (pr *Predict) MentionPrice(p *Price) map[string]int64 {
+	v := map[string]int64{}
 	for k, _ := range pr.Users {
 		u:=pr.Users[k]
 		m := u.Mention
 		for i := 0; i < len(m); i += 2 {
 			if (m[i]>>16) == pr.Born.Unix() && int(m[i]&0xffff) == p.Code {
-				v[m[i+1]]=u.Screen
+				v[u.Screen]=m[i+1]
 			}
 		}
 	}

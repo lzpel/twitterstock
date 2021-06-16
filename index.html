@@ -27,7 +27,7 @@
 		<td>{{$p.Name}}</td>
 		<td>{{$p.FullName}}</td>
 		<td>{{$p.Value | Percent}}</td>
-		<td style="word-break:break-all;">{{range $i, $m := ($predict.MentionPrice $p)}}<a target="_blank" href="https://twitter.com/{{$m}}/status/{{$i}}">*</a>{{end}}</td>
+		<td style="word-break:break-all;">{{range $i, $m := ($predict.MentionPrice $p)}}<a target="_blank" href="https://twitter.com/{{$i}}/status/{{$m}}">@{{$i}}</a>{{end}}</td>
 	</tr>
 {{end}}
 </table>
