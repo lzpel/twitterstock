@@ -297,6 +297,7 @@ func Prediction(users []User, markets []Market, prices []Price, future time.Time
 	//最後は予測
 	// TODO: Deep Copy
 	predict := Predict{
+		Last:   future,
 		Born:   Daily(future),
 		Users:  users,
 		Prices: prices,

@@ -6,12 +6,12 @@ import (
 )
 
 const (
-	SeedUserId  = 1086060182860292096 //ぱちょ@h2bl0cker_
-	UsersLimit  = 100
-	MarketDays  = 5
-	CacheAge    = time.Hour * 24 * 10
+	SeedUserId        = 1086060182860292096 //ぱちょ@h2bl0cker_
+	UsersLimit        = 100
+	MarketDays        = 5
+	CacheAge          = time.Hour * 24 * 10
 	ExcludePriceWords = "トレンドサイバーローソン"
-	IncludeUserWords = "株,運用,資産,投資,先物,銘柄,取引,相場,不動産"
+	IncludeUserWords  = "株,運用,資産,投資,先物,銘柄,取引,相場,不動産"
 )
 
 type Price struct {
@@ -38,9 +38,9 @@ type User struct {
 }
 
 type Predict struct {
-	Born   time.Time
-	Users  []User  `datastore:",noindex"`
-	Prices []Price `datastore:",noindex"`
+	Born, Last time.Time
+	Users      []User  `datastore:",noindex"`
+	Prices     []Price `datastore:",noindex"`
 }
 
 func (p *Predict) Key() *datastore.Key {
