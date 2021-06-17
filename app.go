@@ -39,8 +39,9 @@ func main() {
 		}, "index.html")
 	})
 	if false {
+		ModifyPrediction()
 		//TestTwitter()
-		UpdatePrediction(true, true, 1)
+		//UpdatePrediction(true, true, 1)
 	} else {
 		Listen()
 	}
@@ -76,7 +77,7 @@ func UpdateMarket() {
 	}
 }
 func UpdatePrediction(put bool, useCache bool, count int) Predict {
-	markets := make([]Market, 0, 5)
+	markets := make([]Market, 0, MarketDays)
 	TableGetAll(NewQuery("MARKET").Limit(cap(markets)).Order("-Born"), &markets)
 	predicts := make([]Predict, 0, 1)
 	TableGetAll(NewQuery("PREDICT").Limit(cap(predicts)).Order("-Born"), &predicts)
@@ -105,13 +106,32 @@ func UpdatePrediction(put bool, useCache bool, count int) Predict {
 	return predict
 }
 
-func ClearPrediction() {
-	for true {
-		keys := TableGetAll(NewQuery("PREDICT").Limit(1000).Order("-Born").KeysOnly(), nil)
-		if keys == nil || len(keys) == 0 {
-			break
+func ModifyPrediction() {
+	if false{
+		predicts := make([]Predict, 0, 1)
+		TableGetAll(NewQuery("PREDICT").Limit(cap(predicts)).Order("-Born"), &predicts)
+		predict:=predicts[0]
+		users:=predict.Users
+		predict.Users=make([]User,0,len(users))
+		for _,v:=range users{
+			if IsValidUser(&v){
+				predict.Users=append(predict.Users,v)
+				fmt.Println(true, v.Screen, v.Description)
+			}else{
+				fmt.Println(false, v.Screen ,v.Description)
+			}
 		}
-		TableDeleteAll(keys)
-		time.Sleep(time.Second)
+		fmt.Println(len(predict.Users))
+		TablePut(predict.Key(),&predict)
+	}
+	if false{
+		for true {
+			keys := TableGetAll(NewQuery("PREDICT").Limit(1000).Order("-Born").KeysOnly(), nil)
+			if keys == nil || len(keys) == 0 {
+				break
+			}
+			TableDeleteAll(keys)
+			time.Sleep(time.Second)
+		}
 	}
 }

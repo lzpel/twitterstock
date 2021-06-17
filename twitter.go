@@ -24,6 +24,7 @@ func NewApi() *anaconda.TwitterApi {
 
 /// @variable
 var PredictTweet = []int64{0, 0, 0, 0}
+var IgnoreWordsList =[]string{}
 
 // @fn
 // unixtimeに最も近い時刻のツイートのIDを予測する関数
@@ -79,8 +80,9 @@ func FormatString(s string) string {
 	return norm.NFKC.String(s)
 }
 
+// @fn
+// 銘柄名の有効判定
 func IsValidName(s string) bool {
-	const IgnoreWords = "トレンドサイバーローソン"
 	score := 0
 	for _, c := range s {
 		if (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') {
@@ -91,14 +93,26 @@ func IsValidName(s string) bool {
 			score += 100
 		}
 	}
-	if strings.Contains(IgnoreWords, s) {
+	if strings.Contains(ExcludePriceWords, s) {
 		score = 0
 	}
 	return score >= 300
 }
 
-func HasReference(s string, p *Price) bool {
-	tw, ns, nl := FormatString(s), FormatString(p.Name), FormatString(p.FullName)
+func IsValidUser(u*User) bool{
+	if len(IgnoreWordsList)==0{
+		IgnoreWordsList=strings.Split(IncludeUserWords,",")
+	}
+	for _,v:=range IgnoreWordsList{
+		if strings.Contains(u.Description,v) && len(v)!=0{
+			return true
+		}
+	}
+	return false
+}
+
+func HasReference(text string, p *Price) bool {
+	tw, ns, nl := FormatString(text), FormatString(p.Name), FormatString(p.FullName)
 	if (strings.Contains(tw, ns) && IsValidName(ns)) || (strings.Contains(tw, nl) && IsValidName(nl)) {
 		return true
 	}
@@ -156,26 +170,26 @@ func MentionUser(user *User, prices map[int]*Price, output map[*Price][]*User, d
 	Mention := make([]int64, 0, len(user.Mention))
 	for i := 0; i < len(user.Mention); i += 2 {
 		unix, code, id := user.Mention[i]>>16, int(user.Mention[i]&0xffff), user.Mention[i+1]
+		//寿命判定
 		if unix > age.Unix() {
+			//言及保持継続
 			Mention = append(Mention, user.Mention[i], user.Mention[i+1])
+			//指定されている期間なら言及マップに追加
 			if minID < id && id < maxID && code != 0 {
+				//新規上場銘柄への言及などで過去の銘柄テーブルに無い銘柄を参照した場合無視する。
 				if price, ok := prices[code]; ok {
 					//メモリをロックしてから書き込む
-					if mu!=nil{
-						mu.Lock()
-					}
+					mu.Lock()
 					vars, _ := output[price]
 					output[price] = append(vars, user)
-					if mu!=nil{
-						mu.Unlock()
-					}
+					mu.Unlock()
 				} else {
-					//新規上場銘柄への言及などで到達する可能性がある
 					fmt.Println("No price", code)
 				}
 			}
 		}
 	}
+	//この辺の処理は複数の市場を統合して処理できるはず。
 	user.Mention = Mention
 }
 
@@ -325,12 +339,13 @@ func AppendUsers(users []User, maxLength int) []User {
 				fmt.Printf("no friends", user.Name, user.Screen, user.Id)
 			} else {
 				for _, v := range cursor.Users {
-					if v.Protected == false {
-						u := User{
-							Id:     int(v.Id),
-							Screen: v.ScreenName,
-							Name:   v.Name,
-						}
+					u := User{
+						Id:     int(v.Id),
+						Screen: v.ScreenName,
+						Name:   v.Name,
+						Description: v.Description,
+					}
+					if v.Protected == false && IsValidUser(&u){
 						stock[u.Id] = &u
 					}
 				}
