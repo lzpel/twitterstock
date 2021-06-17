@@ -34,8 +34,8 @@
 <table class="table">
 	<tr>
 		<th>#</th>
-		<th>個人投資家Twitter</th>
-		<th>ID</th>
+		<th>twitter</th>
+		<th>profile</th>
 		<th>係数</th>
 		<th>ツイート</th>
 	</tr>
@@ -44,9 +44,9 @@
 		<td>{{$i}}</td>
 		<td style="overflow:hidden;">
 			<a href="https://twitter.com/{{$u.Screen}}"
-			   style="text-overflow:ellipsis;width:100px;white-space:nowrap;">{{$u.Name}}</a>
+			   style="text-overflow:ellipsis;width:100px;white-space:nowrap;">{{$u.Name}}@{{$u.Screen}}</a>
 		</td>
-		<td>@{{$u.Screen}}</td>
+		<td>{{$u.Description}}</td>
 		<td>{{$u.Coefficient | Coefficient}}</td>
 		<td style="word-break:break-all;">{{range $i, $m := ($predict.MentionUser $u)}}<a target="_blank" href="https://twitter.com/twitter/status/{{$i}}">{{$m}}</a>{{end}}</td>
 	</tr>
