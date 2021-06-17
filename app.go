@@ -8,10 +8,10 @@ import (
 func main() {
 	time.Local, _ = time.LoadLocation("Asia/Tokyo")
 	Credentialize("service.json")
-	Handle("/market", func(w Response, r Request) {
+	Handle("/market/", func(w Response, r Request) {
 		UpdateMarket()
 	})
-	Handle("/twitter", func(w Response, r Request) {
+	Handle("/twitter/", func(w Response, r Request) {
 		UpdatePrediction(true, true, 1)
 		fmt.Fprintln(w, "<a href='/'>back</a>")
 	})

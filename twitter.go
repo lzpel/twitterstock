@@ -256,14 +256,18 @@ func Train(users []User, markets []Market, future time.Time) ([]User, []Price) {
 		v := make([]float64, len(usersMap))
 		for _, n := range m {
 			if idx, ok := usersMap[n]; ok {
-				//乱数を用いて線形従属ベクトルによる係数発散を避ける
-				v[idx] = 1.0 + rand.Float64()/10
+				v[idx] = 1.0
 			} else {
 				//ここに到達する場合、nは過去の言及が無く未来の言及が有るユーザー
 				//NaN係数を避けるため無視する
 			}
 		}
 		if k.High >= 0 {
+			//乱数を用いて線形従属ベクトルによる係数発散を避ける
+			for k,_:=range v{
+				v[k]+= (rand.Float64()-0.5)*0.05
+			}
+			//追加
 			r.Train(regression.DataPoint(k.Value, v))
 		} else {
 			predict[k] = v
