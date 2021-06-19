@@ -24,7 +24,7 @@ func NewApi() *anaconda.TwitterApi {
 
 /// @variable
 var PredictTweet = []int64{0, 0, 0, 0}
-var IgnoreWordsList =[]string{}
+var IgnoreWordsList = []string{}
 
 // @fn
 // unixtimeに最も近い時刻のツイートのIDを予測する関数
@@ -99,12 +99,12 @@ func IsValidName(s string) bool {
 	return score >= 300
 }
 
-func IsValidUser(u*User) bool{
-	if len(IgnoreWordsList)==0{
-		IgnoreWordsList=strings.Split(IncludeUserWords,",")
+func IsValidUser(u *User) bool {
+	if len(IgnoreWordsList) == 0 {
+		IgnoreWordsList = strings.Split(IncludeUserWords, ",")
 	}
-	for _,v:=range IgnoreWordsList{
-		if strings.Contains(u.Description,v) && len(v)!=0{
+	for _, v := range IgnoreWordsList {
+		if strings.Contains(u.Description, v) && len(v) != 0 {
 			return true
 		}
 	}
@@ -131,119 +131,169 @@ func IsValidPrice(v *Price) bool {
 	return false
 }
 
-func MentionUser(user *User, prices map[int]*Price, output map[*Price][]*User, day, age time.Time,mu *sync.Mutex, wg *sync.WaitGroup) {
+func MentionUser(user *User, markets []Market, mentionMap map[*Price][]*User, mu *sync.Mutex, wg *sync.WaitGroup) {
 	if wg != nil {
 		defer wg.Done()
 	}
-	minID, maxID := PredictTweetTime(0, day.Add(-time.Hour * 24).Unix()), PredictTweetTime(0, day.Unix())
-	cacheSkip := false
-	for _, v := range user.Mention {
-		if (v >> 16) == day.Unix() {
-			cacheSkip = true
-			break
+	diff0:=time.Now()
+	fmt.Println("MentionUser", user.Name, user.Screen)
+	newMarkets := map[int64]*Market{}
+	var minTime, maxTime time.Time
+	for _, m := range markets {
+		startTime,cacheSkip := Daily(m.Born),false
+		for _, v := range user.Mention {
+			if (v >> 16) == startTime.Unix() {
+				cacheSkip = true
+				break
+			}
+		}
+		if cacheSkip == false {
+			newMarkets[startTime.Unix()] = &m
+			if maxTime.Unix() < 0 || maxTime.Unix() < startTime.Unix() {
+				maxTime = startTime
+			}
+			startTime=startTime.Add(-24 * time.Hour)
+			if minTime.Unix() < 0 || minTime.Unix() > startTime.Unix() {
+				minTime = startTime
+			}
 		}
 	}
-	if cacheSkip == false {
-		user.Mention = append(user.Mention, day.Unix()<<16+int64(0), 0)
-		v := url.Values{}
-		v.Set("user_id", strconv.Itoa(user.Id))
-		v.Set("max_id", strconv.FormatInt(maxID, 10))
-		v.Set("since_id", strconv.FormatInt(minID, 10))
-		v.Set("count", strconv.Itoa(200))
-		v.Set("exclude_replies", "false")
-		if tweets, err := NewApi().GetUserTimeline(v); err != nil {
-			fmt.Printf("no tweets https://twitter.com/%v\n", user.Screen)
-		} else {
-			for _, tweet := range tweets {
-				PredictTweetTimeUpdate(&tweet)
-				for _, p := range prices {
-					if HasReference(tweet.FullText, p) {
-						user.Mention = append(user.Mention, day.Unix()<<16+int64(p.Code), tweet.Id)
+	for _,v:= range markets{
+		start:=Daily(v.Born)
+		_,ok:=newMarkets[start.Unix()]
+		fmt.Println(start,ok)
+	}
+	diff1,diff2,diffCount:=time.Now(),time.Now(),0
+	if len(newMarkets) == 0 {
+		fmt.Println("Skipped", user.Name, user.Screen)
+	} else {
+		maxID, minID := PredictTweetTime(0, maxTime.Unix()), PredictTweetTime(0, minTime.Unix())
+		fmt.Println(maxTime,minTime,maxID,minID)
+		type Tweet struct {
+			A, B int64
+		}
+		allTweets := []Tweet{}
+		for k, _ := range newMarkets {
+			allTweets = append(allTweets, Tweet{A: k<< 16, B: 0})
+		}
+		diff1=time.Now()
+		for maxID != minID {
+			v := url.Values{}
+			v.Set("user_id", strconv.Itoa(user.Id))
+			v.Set("max_id", strconv.FormatInt(maxID, 10))
+			//v.Set("since_id", strconv.FormatInt(minID, 10))
+			v.Set("count", strconv.Itoa(200))
+			v.Set("exclude_replies", "false")
+			v.Set("trim_user", "true")
+			diffCount++
+			if page, err := NewApi().GetUserTimeline(v); err != nil {
+				fmt.Printf("no tweets https://twitter.com/%v\n", user.Screen)
+				break
+			} else if len(page) <= 2 {
+				//終了条件1：アカウントの取得可能な最古のツイートを発見した
+				break
+			}else{
+				for _, tw := range page {
+					PredictTweetTimeUpdate(&tw)
+					if minID > tw.Id {
+						//終了条件2：必要分より古いツイートを発見した
+						maxID = minID
+						break
+					} else {
+						maxID = tw.Id-1
+					}
+					born, _ := tw.CreatedAtTime()
+					tweetBorn := Daily(born.Add(24 * time.Hour)).Unix()
+					if m,ok:=newMarkets[tweetBorn];ok==true{
+						for _, p := range m.Prices {
+							if HasReference(tw.FullText, &p) {
+								allTweets = append(allTweets, Tweet{A: tweetBorn<<16 + int64(p.Code), B: tw.Id})
+							}
+						}
 					}
 				}
 			}
 		}
-		fmt.Println(user.Name, "Done")
-	} else {
-		fmt.Println(user.Name, "Skipped")
+		diff2=time.Now()
+		sort.Slice(allTweets, func(i, j int) bool {
+			return allTweets[i].A < allTweets[j].A
+		})
+		for _, v := range allTweets {
+			user.Mention = append(user.Mention, v.A, v.B)
+		}
+		fmt.Println("Done", user.Name, user.Screen)
 	}
+	Age:= time.Now().Add(-CacheAge)
 	Mention := make([]int64, 0, len(user.Mention))
 	for i := 0; i < len(user.Mention); i += 2 {
-		unix, code, id := user.Mention[i]>>16, int(user.Mention[i]&0xffff), user.Mention[i+1]
+		unix, code, _ := user.Mention[i]>>16, int(user.Mention[i]&0xffff), user.Mention[i+1]
 		//寿命判定
-		if unix > age.Unix() {
+		if unix > Age.Unix() {
 			//言及保持継続
 			Mention = append(Mention, user.Mention[i], user.Mention[i+1])
-			//指定されている期間なら言及マップに追加
-			if minID < id && id < maxID && code != 0 {
-				//新規上場銘柄への言及などで過去の銘柄テーブルに無い銘柄を参照した場合無視する。
-				if price, ok := prices[code]; ok {
-					//メモリをロックしてから書き込む
-					mu.Lock()
-					vars, _ := output[price]
-					output[price] = append(vars, user)
-					mu.Unlock()
-				} else {
-					fmt.Println("No price", code)
+			//時刻一致で言及マップに追加
+			for j,_:=range markets{
+				market:=&markets[j]
+				startTime:=Daily(market.Born)
+				if unix==startTime.Unix() && code != 0 {
+					//新規上場銘柄への言及などで過去の銘柄テーブルに無い銘柄を参照した場合無視する。
+					for k,_:=range market.Prices{
+						price:=&market.Prices[k]
+						if price.Code==code{
+							mu.Lock()
+							vars, _ := mentionMap[price]
+							mentionMap[price] = append(vars, user)
+							mu.Unlock()
+						}
+					}
 				}
 			}
 		}
 	}
-	//この辺の処理は複数の市場を統合して処理できるはず。
 	user.Mention = Mention
-}
-
-func Mention(users []User, prices []Price, day time.Time, mentionMap map[*Price][]*User) {
-	// Yベクトル
-	pricesMap := map[int]*Price{}
-	for k, _ := range prices {
-		if IsValidPrice(&prices[k]) {
-			pricesMap[prices[k].Code] = &prices[k]
-		}
-	}
-	// X行列
-	day = Daily(day)
-	age := time.Now().Add(- CacheAge)
-	wg := &sync.WaitGroup{}
-	mu := &sync.Mutex{}
-	for k, _ := range users {
-		wg.Add(1)
-		go MentionUser(&users[k], pricesMap, mentionMap, day, age, mu, wg)
-	}
-	wg.Wait()
+	diff3:=time.Now()
+	fmt.Println("Diff",user.Name,user.Screen,"API",diffCount,diff1.Sub(diff0).Milliseconds(),diff2.Sub(diff1).Milliseconds(),diff3.Sub(diff2).Milliseconds())
 }
 
 /// @fn
-func Train(users []User, markets []Market, future time.Time) ([]User, []Price) {
-	//言及のキャッシュと人物列挙
-	//アドレスを用いて日付x価格と人物のmapを作成しているのでusersとmarketsとPricesは複製してはならない。
-	mentionMap := map[*Price][]*User{}
-	for k, _ := range markets {
-		Mention(users, markets[k].Prices, markets[k].Born, mentionMap)
+func Train(users []User, prices []Price, future time.Time, markets []Market) ([]User, []Price, bool) {
+	//アドレスを用いて日付x価格と人物のmapを作成しているのでusersとmarketsとPricesは複製してはならない。しかしmarkets[n].Pricesとpredictは別領域である必要がある。
+	marketFuture:=Market{
+		Prices:append([]Price{}, prices...),
+		Born:future,
 	}
-	//逆写像
+	for k, _ := range marketFuture.Prices {
+		marketFuture.Prices[k].High = -1
+	}
+	markets=append(markets,marketFuture)
+	//言及のキャッシュと言及マップを作成
+	mentionMap := map[*Price][]*User{}
+	wg, mu := &sync.WaitGroup{}, &sync.Mutex{}
+	for i, _ := range users {
+		wg.Add(1)
+		go MentionUser(&users[i], markets, mentionMap, mu, wg)
+	}
+	wg.Wait()
+	//言及マップの逆写像を作成
 	mentionReverseMap := map[*User][]*Price{}
-	for k, m := range mentionMap {
-		for _, n := range m {
-			mentionReverseMap[n] = append(mentionReverseMap[n], k)
+	for p, pusers := range mentionMap {
+		if p.High>0{
+			for _, u := range pusers {
+				mentionReverseMap[u] = append(mentionReverseMap[u], p)
+			}
 		}
 	}
-	//言及の人物列挙
+	//逆写像から条件付きで人物列挙する
 	usersMap := map[*User]int{}
 	for k, m := range mentionReverseMap {
 		//複数の株価言及を条件とする
-		if len(m) >= 2 {
+		if len(m) > int(MentionRate * float32(len(markets)-1)) {
 			if _, ok := usersMap[k]; ok == false {
 				usersMap[k] = len(usersMap)
 			}
 		}
 	}
-	//逆にmarkets[n].Pricesとpredictは別領域である必要がある。
-	futurePrices := append([]Price{}, markets[0].Prices...)
-	Mention(users, futurePrices, future, mentionMap)
-	for k, _ := range futurePrices {
-		futurePrices[k].High = -1
-	}
+	wg.Wait()
 	//予測
 	r := new(regression.Regression)
 	r.SetObserved("株価の変動率")
@@ -252,34 +302,35 @@ func Train(users []User, markets []Market, future time.Time) ([]User, []Price) {
 	}
 	//学習
 	predict := map[*Price][]float64{}
-	for k, m := range mentionMap {
-		v := make([]float64, len(usersMap))
-		for _, n := range m {
+	for p, pusers := range mentionMap {
+		v,skip := make([]float64, len(usersMap)),true
+		for _, n := range pusers {
 			if idx, ok := usersMap[n]; ok {
 				v[idx] = 1.0
+				skip=false
 			} else {
-				//ここに到達する場合、nは過去の言及が無く未来の言及が有るユーザー
-				//NaN係数を避けるため無視する
+				//ここに到達する場合、nは過去の言及が無く未来の言及が有るユーザー、NaN係数を避けるため無視する
 			}
 		}
-		if k.High >= 0 {
-			//乱数を用いて線形従属ベクトルによる係数発散を避ける
-			for k,_:=range v{
-				v[k]+= (rand.Float64()-0.5)*0.05
-			}
-			//追加
-			r.Train(regression.DataPoint(k.Value, v))
+		if skip==true || IsValidPrice(p)==false{
+			//有効な言及者がいないOR価格が不正
+			continue
+		}
+		if p.High >= 0 {
+			r.Train(regression.DataPoint(p.Value, v))
 		} else {
-			predict[k] = v
+			predict[p] = v
 		}
 	}
-	r.Run()
-	fmt.Println(r.Formula)
-	fmt.Println(r)
+	if e:=r.Run();e!=nil{
+		fmt.Println(e)
+	}else{
+		fmt.Println(r.Formula)
+		fmt.Println(r)
+	}
 	futureUsers, futurePrices := []User{}, []Price{}
 	for k, m := range usersMap {
 		k.Coefficient = r.Coeff(m + 1)
-		fmt.Println(m, k.Name, k.Screen, k.Coefficient)
 		futureUsers = append(futureUsers, *k)
 	}
 	for k, m := range predict {
@@ -292,12 +343,21 @@ func Train(users []User, markets []Market, future time.Time) ([]User, []Price) {
 	}
 	sort.Slice(futureUsers, func(i, j int) bool { return math.Abs(futureUsers[i].Coefficient) > math.Abs(futureUsers[j].Coefficient) })
 	sort.Slice(futurePrices, func(i, j int) bool { return futurePrices[i].Value > futurePrices[j].Value })
-	return futureUsers, futurePrices
+	for k,v:=range futureUsers{
+		fmt.Println(k,v.Name,v.Screen)
+		for i:=0;i<len(v.Mention);i+=2{
+			unix, code, id := v.Mention[i]>>16, int(v.Mention[i]&0xffff), v.Mention[i+1]
+			if code!=0{
+				fmt.Printf("unix=%v code=%v https://twitter.com/%v/status/%v\n",unix,code,v.Screen,id)
+			}
+		}
+	}
+	return futureUsers, futurePrices, math.Abs(futureUsers[0].Coefficient)<1.0
 }
 
 /// @fn
 /// ユーザーリストを更新し、予測する
-func Prediction(users []User, markets []Market, prices []Price, future time.Time, useCache bool) Predict {
+func Prediction(users []User, markets []Market, prices []Price, future time.Time) (Predict,bool) {
 	//最後は予測
 	// TODO: Deep Copy
 	predict := Predict{
@@ -309,11 +369,12 @@ func Prediction(users []User, markets []Market, prices []Price, future time.Time
 	//追加：20%増し
 	predict.Users = AppendUsers(predict.Users, UsersLimit*6/5)
 	//学習と予測
-	predict.Users, predict.Prices = Train(predict.Users, markets, predict.Born)
+	var isValid bool
+	predict.Users, predict.Prices,isValid = Train(predict.Users, predict.Prices, predict.Born,markets)
 	if len(predict.Users) > UsersLimit {
 		predict.Users = predict.Users[:UsersLimit]
 	}
-	return predict
+	return predict,isValid
 }
 
 /// @fn 追加する
@@ -345,12 +406,12 @@ func AppendUsers(users []User, maxLength int) []User {
 			} else {
 				for _, v := range cursor.Users {
 					u := User{
-						Id:     int(v.Id),
-						Screen: v.ScreenName,
-						Name:   v.Name,
+						Id:          int(v.Id),
+						Screen:      v.ScreenName,
+						Name:        v.Name,
 						Description: v.Description,
 					}
-					if v.Protected == false && IsValidUser(&u){
+					if v.Protected == false && IsValidUser(&u) {
 						stock[u.Id] = &u
 					}
 				}
@@ -366,7 +427,7 @@ func AppendUsers(users []User, maxLength int) []User {
 			users = append(users, *v)
 		}
 	}
-	fmt.Println("投資家候補の追加完了。現在 %v 人。",len(users))
+	fmt.Println("投資家候補の追加完了。", len(users))
 	return users
 }
 
@@ -427,5 +488,5 @@ func TestTwitter() {
 	fmt.Println(225, false, HasReference("lại rồi ý, nay còn tụ tập siêu đông ntn", &Price{Name: "ＮＴＮ", FullName: "ＮＴＮ"}))
 	fmt.Println(450, true, HasReference("おかげでH2Oリテイ、高島屋、Jフロント", &Price{Name: "Ｈ２Ｏリテイ", FullName: "エイチ・ツー・オーリテイリング"}))
 	fmt.Println(time.Unix(PredictTweetTime(1401567948079190019, 0), 0).String(), "午前0:53 · 2021年6月7日")
-	Prediction(users, markets, markets[0].Prices, markets[0].Born, true)
+	Prediction(users, markets, markets[0].Prices, markets[0].Born)
 }
