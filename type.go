@@ -8,8 +8,9 @@ import (
 const (
 	SeedUserId        = 1086060182860292096 //ぱちょ@h2bl0cker_
 	UsersLimit        = 100
-	MarketDays        = 5
-	CacheAge          = time.Hour * 24 * 10
+	MarketDays        = 14
+	CacheAge          = time.Hour * 24 * 30
+	MentionRate    = 0.5
 	ExcludePriceWords = "トレンドサイバーローソン"
 	IncludeUserWords  = "株,運用,資産,投資,先物,銘柄,取引,相場,不動産"
 )

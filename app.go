@@ -12,7 +12,7 @@ func main() {
 		UpdateMarket()
 	})
 	Handle("/twitter/", func(w Response, r Request) {
-		UpdatePrediction(true, true, 1)
+		UpdatePrediction(true)
 		fmt.Fprintln(w, "<a href='/'>back</a>")
 	})
 	Handle("/", func(w Response, r Request) {
@@ -39,9 +39,9 @@ func main() {
 		}, "index.html")
 	})
 	if false {
-		ModifyPrediction()
+		//ModifyPrediction()
 		//TestTwitter()
-		//UpdatePrediction(true, true, 1)
+		UpdatePrediction(false)
 	} else {
 		Listen()
 	}
@@ -76,7 +76,7 @@ func UpdateMarket() {
 		TablePut(NewKey("MARKET"), market)
 	}
 }
-func UpdatePrediction(put bool, useCache bool, count int) Predict {
+func UpdatePrediction(put bool) Predict {
 	markets := make([]Market, 0, MarketDays)
 	TableGetAll(NewQuery("MARKET").Limit(cap(markets)).Order("-Born"), &markets)
 	predicts := make([]Predict, 0, 1)
@@ -95,13 +95,9 @@ func UpdatePrediction(put bool, useCache bool, count int) Predict {
 			},
 		}
 	}
-	var predict Predict
-	for i := 0; i < count; i++ {
-		predict = Prediction(predicts[0].Users, markets, markets[0].Prices, time.Now(), useCache)
-		if put {
-			TablePut(predict.Key(), &predict)
-		}
-		predicts[0] = predict
+	predict,isValid := Prediction(predicts[0].Users, markets, markets[0].Prices, time.Now())
+	if put && isValid{
+		TablePut(predict.Key(), &predict)
 	}
 	return predict
 }
