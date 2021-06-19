@@ -11,8 +11,8 @@
 <p>個人投資家のツイートから東証一部上場銘柄への言及を拾い、重回帰分析により未来の株価を予測するシステム</p>
 <a href="https://lzpel.net">© 2021 lzpel</a>
 {{range $predict:=.Predict}}
-<h2 class="display-5">予報 </h2>
-<p>毎日午前6時更新。当日の取引時間中の値動きを予測。</p>
+<h2 class="display-5">予測</h2>
+<p>毎日13時更新。明日の前日比を予測。今日の取引終了までに注文すると良いことあるかもしれない。</p>
 <table class="table">
 	<tr>
 		<th>推定基準時刻</th>
@@ -72,6 +72,7 @@
 		<th>銘柄名</th>
 		<th>始値</th>
 		<th>終値</th>
+		<th>前日比</th>
 	</tr>
 {{range .Prices}}
 	<tr id="{{.Code}}">
@@ -80,6 +81,7 @@
 		<td>{{.FullName}}</td>
 		<td>{{.Open}}</td>
 		<td>{{.Close}}</td>
+		<td>{{.Diff}}</td>
 	</tr>
 {{end}}
 </table>

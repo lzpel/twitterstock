@@ -71,7 +71,7 @@ func PredictTweetTimeUpdate(v *anaconda.Tweet) {
 // 最新の特定時刻に揃えた時刻を返す
 func Daily(t time.Time) time.Time {
 	// 東証の取引時間は現在、午前９時―午後３時で、途中１時間の休憩が入る。
-	const PredictHour = 6
+	const PredictHour = 13
 	t = t.In(time.Local).Add(-time.Hour * time.Duration(PredictHour))
 	return time.Date(t.Year(), t.Month(), t.Day(), PredictHour, 0, 0, 0, time.Local)
 }
@@ -122,7 +122,8 @@ func HasReference(text string, p *Price) bool {
 func IsValidPrice(v *Price) bool {
 	//浮動小数点読み込みミスを暫定的に除外
 	if v.Close > 10 && v.Open > 10 {
-		x := float64(float32(v.Close)/float32(v.Open) - 1)
+		//前日の終値を分母とすると前日比に一致するが情報が無いので当日の始め値を使う
+		x := float64(v.Diff)/float64(v.Open)
 		if 0.5 > math.Abs(x) {
 			v.Value = x
 			return true
