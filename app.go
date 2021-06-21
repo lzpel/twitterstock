@@ -7,7 +7,7 @@ import (
 
 func main() {
 	time.Local, _ = time.LoadLocation("Asia/Tokyo")
-	Credentialize("service.json")
+	Credentialize("twitterstock-1464f6821380.json")
 	Handle("/market/", func(w Response, r Request) {
 		UpdateMarket()
 	})

@@ -1,9 +1,6 @@
 .gcloudignore
 .gitignore
 
-.git
-.idea
-
 *.exe
 *.exe~
 *.dll
@@ -11,3 +8,7 @@
 *.dylib
 *.test
 *.out
+
+.idea/
+*.exe
+# *.json
