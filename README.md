@@ -1,4 +1,5 @@
 # 日経500風見鶏
 
-twitterstock.appspot.com
+https://twitterstock.appspot.com
+
 個人投資家のツイートから東証一部上場銘柄への言及を拾い、重回帰分析により未来の株価を予測するシステム
