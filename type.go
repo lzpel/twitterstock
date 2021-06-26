@@ -10,17 +10,18 @@ const (
 	UsersLimit        = 100
 	MarketDays        = 14
 	CacheAge          = time.Hour * 24 * 30
-	MentionRate    = 0.5
+	MentionRate       = 0.5
 	ExcludePriceWords = "トレンドサイバーローソン"
 	IncludeUserWords  = "株,運用,資産,投資,先物,銘柄,取引,相場,不動産"
 )
 
 type Price struct {
-	Name, FullName               string
-	Code                         int
-	Market                       rune //1,2,j,m
-	Open, Close, High, Low, Diff int
-	Value                        float64
+	Name, FullName                     string
+	Code                               int
+	Market                             rune //1,2,j,m
+	Open, Close, High, Low, Diff       int
+	PredictRegression, PredictBayesian float64
+	Value                              float64 `datastore:",omitempty"`
 }
 
 type Market struct {

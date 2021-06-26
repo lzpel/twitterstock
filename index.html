@@ -28,6 +28,7 @@
 		<th>銘柄略称</th>
 		<th>銘柄名</th>
 		<th>予測</th>
+		<th>予測</th>
 		<th>ツイート</th>
 	</tr>
 {{range $p:=$predict.Prices}}
@@ -35,7 +36,8 @@
 		<td>#{{$p.Code}}</td>
 		<td>{{$p.Name}}</td>
 		<td>{{$p.FullName}}</td>
-		<td>{{$p.Value | Percent}}</td>
+		<td>{{$p.PredictRegression | Percent}}</td>
+		<td>{{$p.PredictBayesian | Percent}}</td>
 		<td style="word-break:break-all;">{{range $i, $m := ($predict.MentionPrice $p)}}<a target="_blank" href="https://twitter.com/{{$i}}/status/{{$m}}">@{{$i}}</a>{{end}}</td>
 	</tr>
 {{end}}
