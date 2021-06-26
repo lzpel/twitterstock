@@ -40,11 +40,12 @@ type User struct {
 }
 
 type Predict struct {
-	Born, Last time.Time
-	Users      []User  `datastore:",noindex"`
-	Prices     []Price `datastore:",noindex"`
+	Last   time.Time
+	Born   time.Time `datastore:",omitempty"`
+	Users  []User    `datastore:",noindex"`
+	Prices []Price   `datastore:",noindex"`
 }
 
 func (p *Predict) Key() *datastore.Key {
-	return NewIdKey("PREDICT", p.Born.Unix())
+	return NewIdKey("PREDICT", DailyDuration(p.Last,30*time.Minute).Unix())
 }

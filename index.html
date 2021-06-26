@@ -8,7 +8,7 @@
 </head>
 <body>
 <h1 class="display-3">日経500風見鶏</h1>
-<p>個人投資家のツイートから東証一部上場銘柄への言及を拾い、重回帰分析により未来の株価を予測するシステム</p>
+<p>個人投資家のツイートから東証一部上場銘柄への言及を拾い、重回帰分析とベイズ推定により未来の株価を予測するシステム</p>
 <a href="https://lzpel.net">© 2021 lzpel</a>
 {{range $predict:=.Predict}}
 <h2 class="display-5">予測</h2>
@@ -27,8 +27,8 @@
 		<th>証券番号</th>
 		<th>銘柄略称</th>
 		<th>銘柄名</th>
-		<th>予測</th>
-		<th>予測</th>
+		<th>値上がり率予想（重回帰分析）</th>
+		<th>値上がり確率（ベイズ推定）</th>
 		<th>ツイート</th>
 	</tr>
 {{range $p:=$predict.Prices}}

@@ -22,7 +22,8 @@ func main() {
 		markets := make([]Market, 0, 1)
 		TableGetAll(NewQuery("MARKET").Limit(cap(markets)).Order("-Born"), &markets)
 		predicts := make([]Predict, 0, 1)
-		TableGetAll(NewQuery("PREDICT").Limit(cap(predicts)).Order("-Born"), &predicts)
+		TableGetAll(NewQuery("PREDICT").Limit(cap(predicts)).Order("-Last"), &predicts)
+		predicts[0].Born=Daily(predicts[0].Last)
 		WriteTemplate(w, map[string]interface{}{
 			"Market":  markets,
 			"Predict": predicts,
@@ -80,7 +81,7 @@ func UpdatePrediction(put bool) Predict {
 	markets := make([]Market, 0, MarketDays)
 	TableGetAll(NewQuery("MARKET").Limit(cap(markets)).Order("-Born"), &markets)
 	predicts := make([]Predict, 0, 1)
-	TableGetAll(NewQuery("PREDICT").Limit(cap(predicts)).Order("-Born"), &predicts)
+	TableGetAll(NewQuery("PREDICT").Limit(cap(predicts)).Order("-Last"), &predicts)
 	if len(predicts) == 0 {
 		predicts = []Predict{
 			{
@@ -122,7 +123,7 @@ func ModifyPrediction() {
 	}
 	if false{
 		for true {
-			keys := TableGetAll(NewQuery("PREDICT").Limit(1000).Order("-Born").KeysOnly(), nil)
+			keys := TableGetAll(NewQuery("PREDICT").Limit(1000).Order("-Last").KeysOnly(), nil)
 			if keys == nil || len(keys) == 0 {
 				break
 			}
