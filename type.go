@@ -11,6 +11,7 @@ const (
 	MarketDays        = 14
 	CacheAge          = time.Hour * 24 * 30
 	MentionRate       = 0.5
+	DeadlineHour    =6
 	ExcludePriceWords = "トレンドサイバーローソン"
 	IncludeUserWords  = "株,運用,資産,投資,先物,銘柄,取引,相場,不動産"
 )
@@ -22,6 +23,10 @@ type Price struct {
 	Open, Close, High, Low, Diff       int
 	PredictRegression, PredictBayesian float64
 	Value                              float64 `datastore:",omitempty"`
+}
+
+func (p*Price)Target()float64{
+	return float64(p.Close-p.Open)/float64(p.Open)
 }
 
 type Market struct {

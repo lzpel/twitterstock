@@ -76,8 +76,7 @@ func PredictTweetTimeUpdate(v *anaconda.Tweet) {
 // 最新の特定時刻に揃えた時刻を返す
 func DailyDuration(t time.Time, duration time.Duration) time.Time {
 	// 東証の取引時間は現在、午前９時―午後３時で、途中１時間の休憩が入る。
-	const PredictHour = 6
-	duration += time.Hour * time.Duration(PredictHour)
+	duration += time.Hour * time.Duration(DeadlineHour)
 	t = t.In(time.Local).Add(-duration)
 	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.Local).Add(+duration)
 }
@@ -275,7 +274,7 @@ func PredictRegression(usersMap map[*User]int, mentionMap map[*Price][]*User) {
 			continue
 		}
 		if p.High >= 0 {
-			r.Train(regression.DataPoint(float64(p.Diff)/float64(p.Open), v))
+			r.Train(regression.DataPoint(p.Target(), v))
 		} else {
 			predict[p] = v
 		}
@@ -302,7 +301,7 @@ func PredictBayesian(mentionReverseMap map[*User][]*Price, mentionMap map[*Price
 	for _, m := range markets {
 		for _, p := range m.Prices {
 			if p.High > 0 {
-				if p.Diff > 0 {
+				if p.Target() > 0 {
 					ga1++
 				} else {
 					ga2++
@@ -319,7 +318,7 @@ func PredictBayesian(mentionReverseMap map[*User][]*Price, mentionMap map[*Price
 		for _, m := range markets {
 			for _, p := range m.Prices {
 				if p.High > 0 && p.Code == k.Code {
-					if p.Diff > 0 {
+					if p.Target() > 0 {
 						pa1++
 					} else {
 						pa2++
@@ -334,7 +333,7 @@ func PredictBayesian(mentionReverseMap map[*User][]*Price, mentionMap map[*Price
 			ua1, ua2 := 0, 0
 			for _, p := range mentionReverseMap[u] {
 				if p.High > 0 {
-					if p.Diff > 0 {
+					if p.Target() > 0 {
 						ua1++
 					} else {
 						ua2++
