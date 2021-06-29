@@ -8,6 +8,7 @@ import (
 	"math"
 	"math/rand"
 	"net/url"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -19,7 +20,7 @@ import (
 // @fn
 // API取得
 func NewApi() *anaconda.TwitterApi {
-	return anaconda.NewTwitterApiWithCredentials("828661472-lMGvALleFfL15jIkFhCgvhhph4ZpMKYlI573cI7a", "Kqch8IsgLBXSbhYvUVzDYSttA4LVl0pcUo55GSVA3CEMT", "mCPWWS6PazLgF36jkUnG4oPIT", "deqbZQubFuYWTWznQV2WfNL93sXoOSyZZsnkefJABb1taXwhYP")
+	return anaconda.NewTwitterApiWithCredentials(os.Getenv("ACCESS_TOKEN"), os.Getenv("ACCESS_SECRET"), os.Getenv("CONSUMER_TOKEN"), os.Getenv("CONSUMER_SECRET"))
 }
 
 /// @variable
