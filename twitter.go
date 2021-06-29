@@ -49,9 +49,9 @@ func PredictTweetTime(id, unix int64) int64 {
 		v.Set("count", strconv.Itoa(200))
 		v.Set("trim_user", "true")
 		v.Set("exclude_replies", "false")
-		if tweets, e := NewApi().GetUserTimeline(v);e!=nil{
+		if tweets, e := NewApi().GetUserTimeline(v); e != nil {
 			log.Fatalln(e)
-		}else{
+		} else {
 			for _, v := range tweets {
 				PredictTweetTimeUpdate(&v)
 			}
@@ -76,7 +76,7 @@ func PredictTweetTimeUpdate(v *anaconda.Tweet) {
 // 最新の特定時刻に揃えた時刻を返す
 func DailyDuration(t time.Time, duration time.Duration) time.Time {
 	// 東証の取引時間は現在、午前９時―午後３時で、途中１時間の休憩が入る。
-	const PredictHour = 13
+	const PredictHour = 6
 	duration += time.Hour * time.Duration(PredictHour)
 	t = t.In(time.Local).Add(-duration)
 	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.Local).Add(+duration)
@@ -84,6 +84,10 @@ func DailyDuration(t time.Time, duration time.Duration) time.Time {
 
 func Daily(t time.Time) time.Time {
 	return DailyDuration(t, 0)
+}
+
+func Deadline(t time.Time) time.Time {
+	return Daily(t)
 }
 
 func FormatString(s string) string {
@@ -129,49 +133,30 @@ func HasReference(text string, p *Price) bool {
 	return false
 }
 
-func MentionUser(user *User, markets []Market, mentionMap map[*User][]*Price, mu *sync.Mutex, wg *sync.WaitGroup) {
-	if wg != nil {
-		defer wg.Done()
-	}
-	fmt.Println("MentionUser", user.Name, user.Screen)
-	newMarkets := map[int64]*Market{}
+func MentionUpdate(user *User, mentions map[int64]Mention, times map[int64][]Price) {
+	//与えられた時刻列~24時間前のツイートを補完する
+	//Dailyを呼び出してはならない
 	var minTime, maxTime time.Time
-	for _, m := range markets {
-		startTime, cacheSkip := Daily(m.Born), false
-		for _, v := range user.Mention {
-			if (v >> 16) == startTime.Unix() {
-				cacheSkip = true
-				break
-			}
-		}
-		if cacheSkip == false {
-			newMarkets[startTime.Unix()] = &m
+	for k, _ := range times {
+		start := Mention{}
+		start.Set(k, 0, 0)
+		if _, ok := mentions[start.Hash]; ok == false {
+			startTime := start.Time()
 			if maxTime.Unix() < 0 || maxTime.Unix() < startTime.Unix() {
 				maxTime = startTime
 			}
-			startTime = startTime.Add(-24 * time.Hour)
+			startTime.Add(-24 * time.Hour)
 			if minTime.Unix() < 0 || minTime.Unix() > startTime.Unix() {
 				minTime = startTime
 			}
+			mentions[start.Hash] = start
 		}
 	}
-	for _, v := range markets {
-		start := Daily(v.Born)
-		_, ok := newMarkets[start.Unix()]
-		fmt.Println(start, ok)
-	}
-	if len(newMarkets) == 0 {
+	if minTime.Unix() == maxTime.Unix() {
 		fmt.Println("Skipped", user.Name, user.Screen)
 	} else {
 		maxID, minID := PredictTweetTime(0, maxTime.Unix()), PredictTweetTime(0, minTime.Unix())
 		fmt.Println(maxTime, minTime, maxID, minID)
-		type Tweet struct {
-			A, B int64
-		}
-		allTweets := []Tweet{}
-		for k, _ := range newMarkets {
-			allTweets = append(allTweets, Tweet{A: k << 16, B: 0})
-		}
 		for maxID != minID {
 			v := url.Values{}
 			v.Set("user_id", strconv.Itoa(user.Id))
@@ -197,53 +182,75 @@ func MentionUser(user *User, markets []Market, mentionMap map[*User][]*Price, mu
 						maxID = tw.Id - 1
 					}
 					born, _ := tw.CreatedAtTime()
-					tweetBorn := Daily(born.Add(24 * time.Hour)).Unix()
-					if m, ok := newMarkets[tweetBorn]; ok == true {
-						for _, p := range m.Prices {
-							if HasReference(tw.FullText, &p) {
-								allTweets = append(allTweets, Tweet{A: tweetBorn<<16 + int64(p.Code), B: tw.Id})
+					for k, prices := range times {
+						if born.Unix() <= k && k < born.Add(24*time.Hour).Unix() {
+							for _, p := range prices {
+								if HasReference(tw.FullText, &p) {
+									start := Mention{}
+									start.Set(born.Unix(), p.Code, tw.Id)
+									mentions[start.Hash] = start
+								}
 							}
 						}
 					}
 				}
 			}
 		}
-		sort.Slice(allTweets, func(i, j int) bool {
-			return allTweets[i].A < allTweets[j].A
-		})
-		for _, v := range allTweets {
-			user.Mention = append(user.Mention, v.A, v.B)
-		}
 		fmt.Println("Done", user.Name, user.Screen)
 	}
+}
+
+func MentionUser(user *User, markets []Market, mentionMap map[*User][]*Price, mu *sync.Mutex, wg *sync.WaitGroup) {
+	if wg != nil {
+		defer wg.Done()
+	}
+	fmt.Println("MentionUser", user.Name, user.Screen)
 	Age := time.Now().Add(-CacheAge)
-	Mention := make([]int64, 0, len(user.Mention))
+	mentions := map[int64]Mention{}
 	for i := 0; i < len(user.Mention); i += 2 {
-		unix, code, _ := user.Mention[i]>>16, int(user.Mention[i]&0xffff), user.Mention[i+1]
-		//寿命判定
-		if unix > Age.Unix() {
-			//言及保持継続
-			Mention = append(Mention, user.Mention[i], user.Mention[i+1])
-			//時刻一致で言及マップに追加
-			for j, _ := range markets {
-				market := &markets[j]
-				startTime := Daily(market.Born)
-				if unix == startTime.Unix() && code != 0 {
-					//新規上場銘柄への言及などで過去の銘柄テーブルに無い銘柄を参照した場合無視する。
-					for k, _ := range market.Prices {
-						price := &market.Prices[k]
-						if price.Code == code {
-							mu.Lock()
-							vars, _ := mentionMap[user]
-							mentionMap[user] = append(vars, price)
-							mu.Unlock()
-						}
+		m := Mention{
+			Hash: user.Mention[i],
+			Id:   user.Mention[i+1],
+		}
+		if Age.Unix() < m.Time().Unix() {
+			mentions[m.Hash] = m
+		}
+	}
+	times := map[int64][]Price{}
+	for _, m := range markets {
+		//当日の基準時刻を用いることはここで判明する
+		times[Deadline(m.Born).Unix()] = m.Prices
+	}
+	MentionUpdate(user, mentions, times)
+	user.Mention = user.Mention[:0]
+	prices := map[*Price]int{}
+	for _, v := range mentions {
+		//言及保持継続
+		user.Mention = append(user.Mention, v.Hash, v.Id)
+		tweet := v.Time()
+		//時刻一致で言及マップに追加
+		for j, _ := range markets {
+			market := &markets[j]
+			dead := Deadline(market.Born)
+			if v.Code() != 0 && tweet.Unix() <= dead.Unix() && dead.Unix() < tweet.Add(24*time.Hour).Unix() {
+				//新規上場銘柄への言及などで過去の銘柄テーブルに無い銘柄を参照した場合無視する。
+				for k, _ := range market.Prices {
+					if price := &market.Prices[k]; price.Code == v.Code() {
+						prices[price] = len(prices)
 					}
 				}
 			}
 		}
 	}
-	user.Mention = Mention
+	if mu != nil {
+		mu.Lock()
+	}
+	for k, _ := range prices {
+		mentionMap[user] = append(mentionMap[user], k)
+	}
+	if mu != nil {
+		mu.Unlock()
+	}
 }
 func PredictRegression(usersMap map[*User]int, mentionMap map[*Price][]*User) {
 	//予測
@@ -291,7 +298,7 @@ func PredictRegression(usersMap map[*User]int, mentionMap map[*Price][]*User) {
 	}
 }
 func PredictBayesian(mentionReverseMap map[*User][]*Price, mentionMap map[*Price][]*User, markets []Market) {
-	var ga1, ga2 int
+	ga1, ga2 := 0, 0
 	for _, m := range markets {
 		for _, p := range m.Prices {
 			if p.High > 0 {
@@ -308,7 +315,7 @@ func PredictBayesian(mentionReverseMap map[*User][]*Price, mentionMap map[*Price
 		if k.High > 0 {
 			continue
 		}
-		var pa1, pa2 int
+		pa1, pa2 := 0, 0
 		for _, m := range markets {
 			for _, p := range m.Prices {
 				if p.High > 0 && p.Code == k.Code {
@@ -324,7 +331,7 @@ func PredictBayesian(mentionReverseMap map[*User][]*Price, mentionMap map[*Price
 		fmt.Println(k.FullName, "初期確率", k.PredictBayesian, pa1, pa2)
 		//ベイズ更新
 		for _, u := range v {
-			var ua1, ua2 int
+			ua1, ua2 := 0, 0
 			for _, p := range mentionReverseMap[u] {
 				if p.High > 0 {
 					if p.Diff > 0 {
@@ -349,6 +356,7 @@ func Train(users []User, prices []Price, future time.Time, markets []Market) ([]
 		Prices: append([]Price{}, prices...),
 		Born:   Daily(future),
 	}
+	fmt.Println(marketFuture.Born)
 	for k, _ := range marketFuture.Prices {
 		marketFuture.Prices[k].High = -1
 	}
@@ -358,11 +366,13 @@ func Train(users []User, prices []Price, future time.Time, markets []Market) ([]
 	wg, mu := &sync.WaitGroup{}, &sync.Mutex{}
 	for i, _ := range users {
 		wg.Add(1)
+		// TODO go
 		go MentionUser(&users[i], markets, mentionMap, mu, wg)
 	}
 	wg.Wait()
 	//発現数が多い人物を列挙する
 	usersMap := map[*User]int{}
+
 	for k, m := range mentionMap {
 		//複数の株価言及を条件とする
 		count := 0
@@ -416,8 +426,8 @@ func Train(users []User, prices []Price, future time.Time, markets []Market) ([]
 /// ユーザーリストを更新し、予測する
 func Prediction(users []User, markets []Market, prices []Price, future time.Time) (Predict, bool) {
 	//最後は予測
-	// TODO: Deep Copy
 	predict := Predict{
+		Dead:   Deadline(future),
 		Last:   future,
 		Users:  users,
 		Prices: prices,

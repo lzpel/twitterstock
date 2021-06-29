@@ -39,9 +39,25 @@ type User struct {
 	Coefficient float64
 }
 
+type Mention struct{
+	Hash,Id int64
+}
+
+func (p*Mention) Set(unix int64,code int, id int64){
+	p.Hash=unix<<16+int64(code)
+	p.Id=id
+}
+
+func (p*Mention) Code() int{
+	return int(p.Hash&0xffff)
+}
+
+func (p*Mention) Time() time.Time{
+	return time.Unix(p.Hash>>16,0).In(time.Local)
+}
+
 type Predict struct {
-	Last   time.Time
-	Born   time.Time `datastore:",omitempty"`
+	Last, Dead   time.Time
 	Users  []User    `datastore:",noindex"`
 	Prices []Price   `datastore:",noindex"`
 }

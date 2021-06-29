@@ -23,7 +23,6 @@ func main() {
 		TableGetAll(NewQuery("MARKET").Limit(cap(markets)).Order("-Born"), &markets)
 		predicts := make([]Predict, 0, 1)
 		TableGetAll(NewQuery("PREDICT").Limit(cap(predicts)).Order("-Last"), &predicts)
-		predicts[0].Born=Daily(predicts[0].Last)
 		WriteTemplate(w, map[string]interface{}{
 			"Market":  markets,
 			"Predict": predicts,
@@ -40,33 +39,34 @@ func main() {
 		}, "index.html")
 	})
 	if false {
-		//ModifyPrediction()
-		//TestTwitter()
 		UpdatePrediction(false)
 	} else {
 		Listen()
 	}
 }
-func (pr *Predict) MentionPrice(p *Price) map[string]int64 {
+func (p *Predict) MentionPrice(price *Price) map[string]int64 {
 	v := map[string]int64{}
-	for k, _ := range pr.Users {
-		u:=pr.Users[k]
+	for k, _ := range p.Users {
+		u := p.Users[k]
 		m := u.Mention
 		for i := 0; i < len(m); i += 2 {
-			if (m[i]>>16) == pr.Born.Unix() && int(m[i]&0xffff) == p.Code {
-				v[u.Screen]=m[i+1]
+			unix, code, id := int64(m[i] >> 16), int(m[i]&0xffff), m[i+1]
+			p.Dead=Deadline(p.Last)
+			if unix<=p.Dead.Unix() && p.Dead.Unix()<unix+86400 && code == price.Code {
+				v[u.Screen] = id
 			}
 		}
 	}
 	return v
 }
 
-func (pr *Predict) MentionUser(u *User) map[int64]int {
+func (p *Predict) MentionUser(u *User) map[int64]int {
 	v := map[int64]int{}
 	m := u.Mention
 	for i := 0; i < len(m); i += 2 {
-		if (m[i]>>16) == pr.Born.Unix() && int(m[i]&0xffff)!=0{
-			v[m[i+1]]=int(m[i]&0xffff)
+		unix, code, id := int64(m[i] >> 16), int(m[i]&0xffff), m[i+1]
+		if unix <= p.Dead.Unix() && p.Dead.Unix() < unix+86400 && code != 0 {
+			v[id] = code
 		}
 	}
 	return v
@@ -96,32 +96,32 @@ func UpdatePrediction(put bool) Predict {
 			},
 		}
 	}
-	predict,isValid := Prediction(predicts[0].Users, markets, markets[0].Prices, time.Now())
-	if put && isValid{
+	predict, isValid := Prediction(predicts[0].Users, markets, markets[0].Prices, time.Now())
+	if put && isValid {
 		TablePut(predict.Key(), &predict)
 	}
 	return predict
 }
 
 func ModifyPrediction() {
-	if false{
+	if false {
 		predicts := make([]Predict, 0, 1)
 		TableGetAll(NewQuery("PREDICT").Limit(cap(predicts)).Order("-Born"), &predicts)
-		predict:=predicts[0]
-		users:=predict.Users
-		predict.Users=make([]User,0,len(users))
-		for _,v:=range users{
-			if IsValidUser(&v){
-				predict.Users=append(predict.Users,v)
+		predict := predicts[0]
+		users := predict.Users
+		predict.Users = make([]User, 0, len(users))
+		for _, v := range users {
+			if IsValidUser(&v) {
+				predict.Users = append(predict.Users, v)
 				fmt.Println(true, v.Screen, v.Description)
-			}else{
-				fmt.Println(false, v.Screen ,v.Description)
+			} else {
+				fmt.Println(false, v.Screen, v.Description)
 			}
 		}
 		fmt.Println(len(predict.Users))
-		TablePut(predict.Key(),&predict)
+		TablePut(predict.Key(), &predict)
 	}
-	if false{
+	if false {
 		for true {
 			keys := TableGetAll(NewQuery("PREDICT").Limit(1000).Order("-Last").KeysOnly(), nil)
 			if keys == nil || len(keys) == 0 {
