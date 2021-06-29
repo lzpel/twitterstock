@@ -5,6 +5,7 @@ import (
 	"github.com/ChimeraCoder/anaconda"
 	"github.com/sajari/regression"
 	"golang.org/x/text/unicode/norm"
+	"log"
 	"math"
 	"math/rand"
 	"net/url"
@@ -48,9 +49,12 @@ func PredictTweetTime(id, unix int64) int64 {
 		v.Set("count", strconv.Itoa(200))
 		v.Set("trim_user", "true")
 		v.Set("exclude_replies", "false")
-		tweets, _ := NewApi().GetUserTimeline(v)
-		for _, v := range tweets {
-			PredictTweetTimeUpdate(&v)
+		if tweets, e := NewApi().GetUserTimeline(v);e!=nil{
+			log.Fatalln(e)
+		}else{
+			for _, v := range tweets {
+				PredictTweetTimeUpdate(&v)
+			}
 		}
 	}
 	if id == 0 {
