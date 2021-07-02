@@ -132,9 +132,17 @@ func HasReference(text string, p *Price) bool {
 	return false
 }
 
-func MentionUpdate(user *User, mentions map[int64]Mention, times map[int64][]Price) {
+func MentionUpdate(user *User , times map[int64][]Price) map[int64]Mention{
 	//与えられた時刻列~24時間前のツイートを補完する
 	//Dailyを呼び出してはならない
+	mentions := map[int64]Mention{}
+	for i := 0; i < len(user.Mention); i += 2 {
+		m := Mention{
+			Hash: user.Mention[i],
+			Id:   user.Mention[i+1],
+		}
+		mentions[m.Hash]=m
+	}
 	var minTime, maxTime time.Time
 	for k, _ := range times {
 		start := Mention{}
@@ -144,7 +152,7 @@ func MentionUpdate(user *User, mentions map[int64]Mention, times map[int64][]Pri
 			if maxTime.Unix() < 0 || maxTime.Unix() < startTime.Unix() {
 				maxTime = startTime
 			}
-			startTime.Add(-24 * time.Hour)
+			startTime=startTime.Add(-24 * time.Hour)
 			if minTime.Unix() < 0 || minTime.Unix() > startTime.Unix() {
 				minTime = startTime
 			}
@@ -197,6 +205,7 @@ func MentionUpdate(user *User, mentions map[int64]Mention, times map[int64][]Pri
 		}
 		fmt.Println("Done", user.Name, user.Screen)
 	}
+	return mentions
 }
 
 func MentionUser(user *User, markets []Market, mentionMap map[*User][]*Price, mu *sync.Mutex, wg *sync.WaitGroup) {
@@ -205,25 +214,18 @@ func MentionUser(user *User, markets []Market, mentionMap map[*User][]*Price, mu
 	}
 	fmt.Println("MentionUser", user.Name, user.Screen)
 	Age := time.Now().Add(-CacheAge)
-	mentions := map[int64]Mention{}
-	for i := 0; i < len(user.Mention); i += 2 {
-		m := Mention{
-			Hash: user.Mention[i],
-			Id:   user.Mention[i+1],
-		}
-		if Age.Unix() < m.Time().Unix() {
-			mentions[m.Hash] = m
-		}
-	}
 	times := map[int64][]Price{}
 	for _, m := range markets {
 		//当日の基準時刻を用いることはここで判明する
 		times[Deadline(m.Born).Unix()] = m.Prices
 	}
-	MentionUpdate(user, mentions, times)
+	mentions:=MentionUpdate(user, times)
 	user.Mention = user.Mention[:0]
 	prices := map[*Price]int{}
 	for _, v := range mentions {
+		if Age.Unix() > v.Time().Unix() {
+			continue
+		}
 		//言及保持継続
 		user.Mention = append(user.Mention, v.Hash, v.Id)
 		tweet := v.Time()
@@ -395,7 +397,6 @@ func Train(users []User, prices []Price, future time.Time, markets []Market) ([]
 			mentionReverseMap[p] = append(mentionReverseMap[p], u)
 		}
 	}
-	wg.Wait()
 	//予測
 	PredictRegression(usersMap, mentionReverseMap)
 	PredictBayesian(mentionMap, mentionReverseMap, markets)
@@ -509,34 +510,22 @@ func TestTwitter() {
 			Name:   "そすうぽよ",
 		},
 	}
+	prices:=[]Price{
+		{
+			Code:     100,
+			Name:     "真ん中あたり",
+			FullName: "サピエンス",
+			Open:     100,
+			Close:    110,
+		},
+	}
 	markets := []Market{
 		{
 			Born: time.Date(2021, time.June, 7, 12, 0, 0, 0, time.Local),
-			Prices: []Price{
-				{
-					Code:     100,
-					Name:     "誕生日",
-					FullName: "サピエンス",
-					Open:     100,
-					Close:    110,
-				},
-				{
-					Code:     101,
-					Name:     "ABC全",
-					FullName: "霊長類",
-					Open:     100,
-					Close:    120,
-				},
-				{
-					Code:     102,
-					Name:     "誕生日",
-					FullName: "ABC全",
-					Open:     100,
-					Close:    100,
-				},
-			},
+			Prices: prices,
 		},
 	}
+	markets=markets
 	r := new(regression.Regression)
 	r.SetObserved("説明変数N+定数項1<=データ量")
 	r.SetVar(0, "#1")
@@ -553,5 +542,6 @@ func TestTwitter() {
 	fmt.Println(225, false, HasReference("lại rồi ý, nay còn tụ tập siêu đông ntn", &Price{Name: "ＮＴＮ", FullName: "ＮＴＮ"}))
 	fmt.Println(450, true, HasReference("おかげでH2Oリテイ、高島屋、Jフロント", &Price{Name: "Ｈ２Ｏリテイ", FullName: "エイチ・ツー・オーリテイリング"}))
 	fmt.Println(time.Unix(PredictTweetTime(1401567948079190019, 0), 0).String(), "午前0:53 · 2021年6月7日")
-	Prediction(users, markets, markets[0].Prices, markets[0].Born)
+	fmt.Println(MentionUpdate(&users[1],map[int64][]Price{Deadline(time.Now()).Unix():prices}))
+	//Prediction(users, markets, markets[0].Prices, markets[0].Born)
 }
