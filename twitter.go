@@ -425,15 +425,14 @@ func Train(users []User, prices []Price, future time.Time, markets []Market) ([]
 /// @fn
 /// ユーザーリストを更新し、予測する
 func Prediction(users []User, markets []Market, prices []Price, future time.Time) (Predict, bool) {
-	//最後は予測
 	predict := Predict{
 		Dead:   Deadline(future),
 		Last:   future,
 		Users:  users,
 		Prices: prices,
 	}
-	//追加：20%増し
-	predict.Users = AppendUsers(predict.Users, UsersLimit*6/5)
+	//追加：10%増し
+	predict.Users = AppendUsers(predict.Users, UsersLimit+UsersAdded)
 	//学習と予測
 	var isValid bool
 	predict.Users, predict.Prices, isValid = Train(predict.Users, predict.Prices, future, markets)
@@ -445,9 +444,6 @@ func Prediction(users []User, markets []Market, prices []Price, future time.Time
 
 /// @fn 追加する
 func AppendUsers(users []User, maxLength int) []User {
-	const (
-		CountCursor = 100
-	)
 	rand.Seed(time.Now().UnixNano())
 	result := map[int]*User{}
 	for k, _ := range users {
@@ -457,14 +453,13 @@ func AppendUsers(users []User, maxLength int) []User {
 	count := 0
 	for _, user := range result {
 		if count += 1; count <= 2 {
-			// フォローを抽出
 			v := url.Values{}
 			if user.Id != 0 {
 				v.Set("user_id", strconv.Itoa(user.Id))
 			} else {
 				v.Set("screen_name", user.Screen)
 			}
-			v.Set("count", strconv.Itoa(CountCursor))
+			v.Set("count", strconv.Itoa(100))
 			v.Set("skip_status", "true")
 			v.Set("include_user_entities", "false")
 			if cursor, err := NewApi().GetFriendsList(v); err != nil {
@@ -478,18 +473,16 @@ func AppendUsers(users []User, maxLength int) []User {
 						Description: v.Description,
 					}
 					if v.Protected == false && IsValidUser(&u) {
-						stock[u.Id] = &u
+						if _, ok := result[u.Id]; ok == false {
+							stock[u.Id] = &u
+						}
 					}
 				}
 			}
 		}
 	}
-	for k, v := range stock {
-		if len(users) >= maxLength {
-			break
-		}
-		if _, ok := result[k]; ok == false {
-			result[k] = v
+	for _, v := range stock {
+		if len(users) < maxLength{
 			users = append(users, *v)
 		}
 	}

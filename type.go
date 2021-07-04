@@ -7,7 +7,8 @@ import (
 
 const (
 	SeedUserId        = 1086060182860292096 //ぱちょ@h2bl0cker_
-	UsersLimit        = 100
+	UsersLimit        = 200
+	UsersAdded        = 20
 	MarketDays        = 14
 	CacheAge          = time.Hour * 24 * 30
 	MentionRate       = 0.5
